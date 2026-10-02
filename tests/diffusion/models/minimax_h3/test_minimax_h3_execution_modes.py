@@ -105,7 +105,7 @@ def test_continuation_validation_error_reaches_all_ranks_before_encoder_collecti
     )
     encode_media = mocker.patch.object(pipeline, "_encode_local_media")
     broadcast_tensor = mocker.patch.object(module, "_broadcast_tensor")
-    wire = []
+    wire: list[dict[str, object]] = []
     rank_group = object()
 
     def broadcast_error(payload, *, src, group):
