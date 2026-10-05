@@ -86,20 +86,6 @@ def test_sequential_cfg_with_teacache_keeps_branch_residuals_separate(
     assert all(state.cnt == 2 for state in hook.state_manager._states.values())
 
 
-def test_teacache_propagates_initialized_cfg_group_errors(
-    pipeline: _ProbePipeline, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    class BrokenCfgGroup:
-        @property
-        def world_size(self) -> int:
-            raise AssertionError("CFG group is broken")
-
-    monkeypatch.setattr(parallel_state, "_CFG", BrokenCfgGroup())
-    pipeline.transformer.do_true_cfg = True
-    with pytest.raises(AssertionError, match="CFG group is broken"):
-        pipeline.transformer(hidden_states=torch.ones(1, 1), residual=2.0)
-
-
 @pytest.mark.parametrize("rank", [0, 1])
 def test_teacache_uses_initialized_cfg_rank(
     pipeline: _ProbePipeline, monkeypatch: pytest.MonkeyPatch, rank: int

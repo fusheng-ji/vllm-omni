@@ -1057,7 +1057,7 @@ def test_predict_noise_with_multi_branch_cfg_parity(
 
 
 class _FlagRecordingTransformer(SimpleTransformer):
-    """Records ``do_true_cfg`` as seen by a hook on the transformer at call time."""
+    """Records ``do_true_cfg`` at each forward call."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -1078,12 +1078,7 @@ class _FlagRecordingPipeline(CFGParallelMixin):
 @pytest.mark.diffusion
 @pytest.mark.cpu
 def test_sequential_cfg_marks_transformer_for_per_branch_caches():
-    """TeaCache separates CFG branches only when the hooked transformer has do_true_cfg set.
-
-    Flux2Klein and other pipelines that rely on this mixin never set it, so with
-    CFG both branches of a step shared one TeaCache state and reused each other's
-    residual. The mixin now sets it for every call and resets it without CFG.
-    """
+    """``predict_noise_maybe_with_cfg`` sets ``transformer.do_true_cfg`` per call and clears it without CFG."""
     pipeline = _FlagRecordingPipeline()
     positive_kwargs, negative_kwargs = _make_two_branch_inputs(
         batch_size=1, channels=4, height=4, width=4, dtype=torch.float32, device=torch.device("cpu"), input_seed=1

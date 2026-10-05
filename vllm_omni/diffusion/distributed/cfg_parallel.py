@@ -88,6 +88,11 @@ class CFGParallelMixin(metaclass=ABCMeta):
         and set self.scheduler to a composite scheduler that handles tuples.
     """
 
+    def _set_transformer_do_true_cfg(self, do_true_cfg: bool) -> None:
+        transformer = getattr(self, "transformer", None)
+        if transformer is not None:
+            transformer.do_true_cfg = do_true_cfg
+
     def predict_noise_maybe_with_cfg(
         self,
         do_true_cfg: bool,
@@ -124,9 +129,7 @@ class CFGParallelMixin(metaclass=ABCMeta):
             positive and negative calls of a step share a state and reuse each
             other's residual.
         """
-        transformer = getattr(self, "transformer", None)
-        if transformer is not None:
-            transformer.do_true_cfg = do_true_cfg
+        self._set_transformer_do_true_cfg(do_true_cfg)
 
         if do_true_cfg:
             # Automatically detect CFG parallel configuration
