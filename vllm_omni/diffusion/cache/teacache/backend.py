@@ -189,7 +189,9 @@ def enable_wan_teacache(pipeline: Any, config: DiffusionCacheConfig) -> None:
     ):
         raise ValueError("Wan TeaCache requires BF16, PP/CFG sizes 1 or 2, TP=SP=1 and no quantization")
     if config.coefficients is None:
-        raise ValueError("Wan TeaCache has no qualified default profile; explicit experimental coefficients are required")
+        raise ValueError(
+            "Wan TeaCache has no qualified default profile; explicit experimental coefficients are required"
+        )
     apply_teacache_hook(
         transformer,
         TeaCacheConfig(
