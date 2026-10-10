@@ -2,9 +2,11 @@
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM-Omni project
 
 import argparse
+import hashlib
 import json
 import multiprocessing as mp
 import os
+import subprocess
 import time
 from pathlib import Path
 
@@ -31,6 +33,24 @@ def main():
     a = p.parse_args()
     root = Path(os.environ.get("WAN_VALIDATION_ROOT", Path(__file__).parent))
     a.out.mkdir(parents=True, exist_ok=True)
+    source = Path(__import__("vllm_omni").__file__).resolve().parent.parent
+    tracked = [
+        "vllm_omni/diffusion/models/wan2_2/wan2_2_transformer.py",
+        "vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2.py",
+        "vllm_omni/diffusion/cache/teacache/hook.py",
+        "vllm_omni/diffusion/cache/teacache/extractors.py",
+        "vllm_omni/diffusion/cache/teacache/backend.py",
+        "vllm_omni/diffusion/distributed/pipeline_parallel.py",
+    ]
+    provenance = {
+        "sha": subprocess.check_output(["git", "-C", str(source), "rev-parse", "HEAD"], text=True).strip(),
+        "job_id": os.environ.get("SLURM_JOB_ID"),
+        "torch": torch.__version__,
+        "cuda": torch.version.cuda,
+        "source_hashes": {name: hashlib.sha256((source / name).read_bytes()).hexdigest() for name in tracked},
+        "driver_hash": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+    }
+    (a.out / "provenance.json").write_text(json.dumps(provenance, indent=2))
     assert a.mode == "none" or os.environ.get("WAN_TRACE_MODE") == a.mode
     if a.mode != "none":
         import wan_instrument
