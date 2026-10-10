@@ -28,6 +28,7 @@ def main():
     assert {key[1] for key in groups} == set(range(args.cfg))
     counts = defaultdict(lambda: {"full": 0, "hits": 0, "requests": 0})
     for (pp, cfg, branch, request), rows in groups.items():
+        assert rows[0]["step"] == 0, (pp, cfg, branch, request, "request counter was not reset")
         assert rows[0]["compute"], (pp, cfg, branch, request, "first call reused a previous request")
         assert branch in ("teacache_positive", "teacache_negative")
         if args.cfg == 2:
