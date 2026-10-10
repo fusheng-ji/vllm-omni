@@ -134,7 +134,15 @@ class ZImageAdapter(DefaultAdapter):
     model_class_name = "ZImagePipeline"
 
 
+class WanAdapter(DefaultAdapter):
+    """Wan native loader; topology-aware collection is performed per PP stage."""
+
+    model_class_name = "WanPipeline"
+    uses_tf_config = True
+
+
 _MODEL_ADAPTERS: dict[str, type[DefaultAdapter]] = {
+    "Wan": WanAdapter,
     "Bagel": BagelAdapter,
     "StableAudio": StableAudioAdapter,
     "Flux2": Flux2Adapter,
