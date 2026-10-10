@@ -50,6 +50,9 @@ def main():
         "cuda": torch.version.cuda,
         "source_hashes": {name: hashlib.sha256((source / name).read_bytes()).hexdigest() for name in tracked},
         "driver_hash": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        "harness_hashes": {
+            p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in Path(__file__).parent.glob("*.py")
+        },
     }
     (a.out / "provenance.json").write_text(json.dumps(provenance, indent=2))
     assert a.mode == "none" or os.environ.get("WAN_TRACE_MODE") == a.mode

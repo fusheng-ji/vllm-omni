@@ -21,6 +21,7 @@ class TracedHook(TeaCacheHook):
     def initialize_hook(self, module):
         result = super().initialize_hook(module)
         self.previous = {}
+        self.branch_states = {}
         self.request_index = 0
         self.pp_rank = get_pp_group().rank_in_group
         self.cfg_rank = get_classifier_free_guidance_rank()
@@ -86,6 +87,11 @@ class TracedHook(TeaCacheHook):
             f.write(json.dumps(row) + "\n")
 
     def _should_compute_full_transformer(self, state, modulated):
+        branch = self.state_manager._current_context
+        assert all(other is not state for name, other in self.branch_states.items() if name != branch)
+        self.branch_states[branch] = state
+        if state.cnt == 0:
+            assert state.previous_residual is None, "Residual leaked across requests"
         if state.cnt < getattr(self, "cache_warmup_steps", 0):
             state.accumulated_rel_l1_distance = 0.0
             compute = True
@@ -109,6 +115,7 @@ class TracedHook(TeaCacheHook):
     def reset_state(self, module):
         super().reset_state(module)
         self.previous.clear()
+        self.branch_states.clear()
         self.request_index += 1
         return module
 
