@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import multiprocessing as mp
 import os
 import time
 from pathlib import Path
@@ -17,6 +18,7 @@ from vllm_omni.inputs.data import OmniDiffusionSamplingParams
 
 
 def main():
+    mp.set_start_method("spawn", force=True)
     p = argparse.ArgumentParser()
     p.add_argument("--pp", type=int, required=True)
     p.add_argument("--cfg", type=int, required=True)
