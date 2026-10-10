@@ -52,3 +52,61 @@ change error relative to native temporal change, and cached/native latency ratio
 Acceptance requires respectively >=0.95, >=0.90, <=0.10 and <=0.90. A failed gate
 must remain visible; unsuccessful measurements must not be described as production
 acceptance. The `smoke` split uses 5 frames at 256x256 and is only a startup test.
+
+## Selection and independent evaluation
+
+`refine.py` evaluates additional thresholds and optional early steps of full
+computation on calibration prompts. For example:
+
+```bash
+python tools/wan_teacache_validation/refine.py --pp 1 --root "$WAN_VALIDATION_ROOT/pp1-refine" --thresholds .07 .075 .08 .085 .09
+python tools/wan_teacache_validation/refine.py --pp 2 --root "$WAN_VALIDATION_ROOT/pp2-warmup30" --thresholds .1 --warmup-steps 30
+```
+
+After all calibration candidates finish, use `freeze.py` with the calibration
+campaign directories to copy the chosen coefficients, input range, threshold,
+warmup policy, prompt/model manifests and checksums into a new directory. Pass a
+separate, clean checkout through `--source-checkout` and use that checkout for
+evaluation. Point `WAN_VALIDATION_ROOT` at the frozen directory for those runs.
+The selector refuses held-out inputs and candidates without real skips in every
+stage/branch. It selects the fastest qualified candidate. If none qualifies, it
+selects the candidate with the smallest worst normalized gate violation and marks
+it `diagnostic_only: true`. Such a run remains a failed production candidate;
+independent evaluation must not be used to tune it further.
+
+For Slurm, use one node, four B200 GPUs, 32 CPUs and 256 GB per job. The validation
+campaign used partition `overflow`, account `wrd` and job name `test`. Short
+20–45 minute allocations were used for individual evaluations/refinements; no
+allocation exceeded eight hours. Preserve Slurm's GPU visibility. Capture the
+job ID, `nvidia-smi topo -m`, `pip freeze`, source SHA and command with each job.
+
+## Metric definitions and limitations
+
+SSIM uses decoded floating-point RGB frames before MP4 compression, Gaussian
+weights (sigma 1.5), population covariance and data range 1. The reported video
+SSIM is the mean over its 17 frames. Dataset SSIM averages those video means;
+the minimum gate uses the lowest video mean.
+
+The temporal metric is deliberately a comparison of motion changes, not just a
+ratio of overall motion magnitudes. For each video, with native frames B and
+cached frames C, it is:
+
+```text
+mean(abs(diff(C, time) - diff(B, time))) / (mean(abs(diff(B, time))) + 1e-8)
+```
+
+The dataset metric averages these per-video ratios. A value of 0.10 is the
+acceptance limit. This metric can detect differences even when both videos look
+smooth. No claim of visible flicker should be inferred solely from it.
+
+Latency is the ratio of total cached to total native request time over equal
+request sets, including tracing overhead. Loading, warmup, image/video export and
+metric computation are excluded. `hits` counts reuse of the entire local block
+stack, not individual layers. The audit verifies that each new request starts at
+step zero with full computation, validates CFG branch mapping, and reports paired
+latent max absolute error, RMSE and relative L2 error.
+
+Use `quality_junit.py comparison.json quality.xml` to export all four measured
+gates, including failures. A completed Slurm process means artifacts were
+produced; production acceptance additionally requires every numerical, quality,
+real-cache-use and performance check to pass.
