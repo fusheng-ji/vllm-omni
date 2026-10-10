@@ -6,6 +6,15 @@ and forces full computation above the largest calibrated input distance. Until t
 policies and stage-specific profiles are integrated into the production backend and validated,
 a passing harness run alone does not qualify the production backend.
 
+Generated outputs belong under an external `WAN_VALIDATION_ROOT`, outside the
+source checkout. See the [evidence summary](results/README.md) for the archived
+runs and remaining production-validation requirements.
+
+The coefficient estimator collects each stamped CFG branch as a separate
+trajectory on its local transformer/PP stage. Its CPU regression exercises the
+collector and fitter; it does not qualify a production cache profile or provide
+distributed orchestration for the standalone estimator.
+
 ## Inputs
 
 Use the model and exact revision in `model.json`. Download its Diffusers snapshot
