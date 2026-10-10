@@ -1561,3 +1561,49 @@ def test_omni_generate_fatal_error_still_closes_engine(monkeypatch: pytest.Monke
 
     assert isinstance(exc_info.value, OmniEngineDeadError)
     assert engine.shutdown_called
+
+
+@pytest.mark.parametrize("py_generator", [False, True])
+def test_omni_submit_error_aborts_partial_batch(monkeypatch: pytest.MonkeyPatch, py_generator: bool):
+    def reject_bad_prompt(engine: FakeAsyncOmniEngine, msg: dict[str, Any]) -> None:
+        if msg["prompt"] == "bad":
+            raise ValueError("invalid prompt")
+        if msg["prompt"] == "retry":
+            _enqueue_omni_final_only_outputs(engine, msg)
+
+    engine = FakeAsyncOmniEngine(stage_metadata=THREE_STAGE_META, on_add_request=reject_bad_prompt)
+    _patch_engine(monkeypatch, engine)
+    app = Omni("dummy-model")
+    try:
+        with pytest.raises(ValueError, match="invalid prompt"):
+            list(app.generate(["ok", "bad", "not submitted"], py_generator=py_generator, use_tqdm=False))
+
+        assert [msg["prompt"] for msg in engine.submitted] == ["ok", "bad"]
+        assert len(engine.aborted) == 1
+        assert set(engine.aborted[0]) == {msg["request_id"] for msg in engine.submitted}
+        assert not app.request_states
+        assert not engine.shutdown_called
+        outputs = list(app.generate(["retry"], py_generator=py_generator, use_tqdm=False))
+        assert [output.stage_id for output in outputs] == [0, 2]
+    finally:
+        app.shutdown()
+
+
+def test_omni_generate_dead_orchestrator_closes_engine(monkeypatch: pytest.MonkeyPatch):
+    engine = FakeAsyncOmniEngine(stage_metadata=THREE_STAGE_META)
+    _patch_engine(monkeypatch, engine)
+    app = Omni("dummy-model")
+
+    def dead_orchestrator() -> None:
+        engine._alive = False
+        raise RuntimeError("Orchestrator died unexpectedly. See logs above.")
+
+    monkeypatch.setattr(engine, "try_get_output", dead_orchestrator)
+    try:
+        with pytest.raises(RuntimeError, match="Orchestrator died unexpectedly"):
+            app.generate(["hello"], use_tqdm=False)
+        assert engine.shutdown_called
+        assert engine.aborted == [[engine.submitted[0]["request_id"]]]
+        assert not app.request_states
+    finally:
+        app.shutdown()

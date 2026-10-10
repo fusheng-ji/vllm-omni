@@ -103,10 +103,11 @@ class Omni(OmniBase):
             self.close()
             raise
         except Exception as e:
-            # Request-scoped failure (e.g. OmniClientError -> 4xx). The in-flight
-            # requests were already aborted inside _run_generation; keep the
-            # engine alive so later generate() calls work, like AsyncOmni.
+            # _run_generation aborts in-flight requests. Keep a healthy engine
+            # reusable, but close if the orchestrator has died.
             logger.exception("[Omni] Failed to run generation: %s", e)
+            if self.errored:
+                self.close()
             raise
 
     def _run_generation_with_generator(
@@ -127,6 +128,7 @@ class Omni(OmniBase):
         sampling_params_list: Sequence[OmniSamplingParams],
         use_tqdm: bool | Callable[..., tqdm] = True,
     ) -> Generator[OmniRequestOutput, None, None]:
+        active_reqs: set[str] = set()
         try:
             sampling_params_list = self._maybe_force_final_only_for_llm_stages(sampling_params_list)
 
@@ -158,6 +160,7 @@ class Omni(OmniBase):
                 req_state = ClientRequestState(req_id)
                 req_state.metrics = metrics
                 self.request_states[req_id] = req_state
+                active_reqs.add(req_id)
 
                 # PD disaggregation: modify stage-0 (prefill) sampling params per request
                 req_sp_list = list(sampling_params_list)
@@ -177,7 +180,6 @@ class Omni(OmniBase):
                 req_state.metrics.stage_first_ts[0] = submit_ts
                 req_start_ts[req_id] = submit_ts
 
-            active_reqs = set(request_ids)
             pbar = None
             if use_tqdm:
                 tqdm_func = use_tqdm if callable(use_tqdm) else tqdm
@@ -215,11 +217,11 @@ class Omni(OmniBase):
                         pbar.update(1)
                     self._log_summary_and_cleanup(req_id)
         except GeneratorExit:
-            if "active_reqs" in locals() and active_reqs:
+            if active_reqs:
                 self.abort(list(active_reqs))
             raise
         except Exception:
-            if "active_reqs" in locals() and active_reqs:
+            if active_reqs:
                 for req_id in active_reqs:
                     self._record_request_failure_once(req_id, reason="stage_error")
                 self.abort(list(active_reqs))
