@@ -35,14 +35,19 @@ def test_wan_rejects_unvalidated_variants(attribute, value):
 @pytest.mark.core_model
 @pytest.mark.diffusion
 @pytest.mark.parametrize(
-    "dtype", [pytest.param(torch.bfloat16, marks=hardware_marks(res={"cuda": ["B200"]}, num_cards=1))]
+    "dtype",
+    [
+        pytest.param(dtype, marks=hardware_marks(res={"cuda": ["B200"]}, num_cards=1))
+        for dtype in (torch.float32, torch.bfloat16)
+    ],
 )
 @pytest.mark.parametrize("reuse", [False, True])
 def test_wan_hook_full_compute_matches_native_forward(dtype, reuse, monkeypatch):
     from vllm.utils.network_utils import get_file_store_init_method
 
     from tests.diffusion.distributed import test_pipeline_parallel as pp
-    from vllm_omni.diffusion.data import OmniDiffusionConfig
+    from vllm_omni.diffusion.config import set_current_diffusion_config
+    from vllm_omni.diffusion.data import AttentionConfig, AttentionSpec, OmniDiffusionConfig
     from vllm_omni.diffusion.forward_context import set_forward_context
     from vllm_omni.diffusion.models.wan2_2.wan2_2_transformer import WanTransformer3DModel
 
@@ -50,7 +55,9 @@ def test_wan_hook_full_compute_matches_native_forward(dtype, reuse, monkeypatch)
     try:
         pp.initialize_model_parallel(pipeline_parallel_size=1, backend="nccl")
         od = OmniDiffusionConfig(model="unused", dtype=dtype)
-        with set_forward_context(omni_diffusion_config=od), torch.inference_mode():
+        if dtype == torch.float32:
+            od.diffusion_attention_config = AttentionConfig(default=AttentionSpec(backend="TORCH_SDPA"))
+        with set_current_diffusion_config(od), set_forward_context(omni_diffusion_config=od), torch.inference_mode():
             model = (
                 WanTransformer3DModel(
                     num_attention_heads=2, attention_head_dim=64, text_dim=32, freq_dim=32, ffn_dim=256, num_layers=2
@@ -87,7 +94,8 @@ def test_wan_hook_full_compute_matches_native_forward(dtype, reuse, monkeypatch)
             )
             model.cfg_branch = "positive"
             for _ in range(2):
-                torch.testing.assert_close(model(**args)[0], expected, rtol=1e-2, atol=1e-2)
+                tolerance = 1e-5 if dtype == torch.float32 else 1e-2
+                torch.testing.assert_close(model(**args)[0], expected, rtol=tolerance, atol=tolerance)
             assert calls == ["positive"] * (1 if reuse else 2)
     finally:
         pp._cleanup_distributed()
