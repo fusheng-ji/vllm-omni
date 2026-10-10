@@ -167,6 +167,8 @@ def enable_wan_teacache(pipeline: Any, config: DiffusionCacheConfig) -> None:
 
     parallel = pipeline.od_config.parallel_config
     transformer = pipeline.transformer
+    if transformer is None:
+        raise ValueError("Wan TeaCache is limited to the single-expert Wan2.1 T2V 1.3B architecture")
     model_config = transformer.config
     if (
         pipeline.has_transformer_2
