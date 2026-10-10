@@ -15,6 +15,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--pp", type=int, required=True)
     parser.add_argument("--root", type=Path, required=True)
+    parser.add_argument("--warmup-steps", type=int, default=0)
     parser.add_argument("--thresholds", type=float, nargs="+", required=True)
     args = parser.parse_args()
     scripts = Path(__file__).parent
@@ -44,6 +45,8 @@ def main():
             "--paired",
             "--limit",
             "6",
+            "--cache-warmup-steps",
+            str(args.warmup_steps),
             "--threshold",
             str(threshold),
             "--out",
@@ -62,7 +65,12 @@ def main():
         metric = json.loads((output / "cache/comparison.json").read_text())
         audit = json.loads((output / "audit.json").read_text())
         candidates.append(
-            {"threshold": threshold, "metrics": metric, "actual_hits": audit["all_branches_skipped_blocks"]}
+            {
+                "threshold": threshold,
+                "warmup_steps": args.warmup_steps,
+                "metrics": metric,
+                "actual_hits": audit["all_branches_skipped_blocks"],
+            }
         )
         (args.root / "candidates.json").write_text(json.dumps(candidates, indent=2))
     eligible = [
@@ -78,6 +86,7 @@ def main():
     winner = min(eligible, key=lambda row: row["metrics"]["latency_ratio"])
     selection = {
         "threshold": winner["threshold"],
+        "warmup_steps": args.warmup_steps,
         "calibration_latency_ratio": winner["metrics"]["latency_ratio"],
         "source": str(args.root / "candidates.json"),
     }

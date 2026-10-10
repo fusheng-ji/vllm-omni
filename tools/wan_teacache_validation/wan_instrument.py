@@ -86,9 +86,13 @@ class TracedHook(TeaCacheHook):
             f.write(json.dumps(row) + "\n")
 
     def _should_compute_full_transformer(self, state, modulated):
-        compute = (
-            True if self.mode in ("collect", "full") else super()._should_compute_full_transformer(state, modulated)
-        )
+        if state.cnt < getattr(self, "cache_warmup_steps", 0):
+            state.accumulated_rel_l1_distance = 0.0
+            compute = True
+        else:
+            compute = (
+                True if self.mode in ("collect", "full") else super()._should_compute_full_transformer(state, modulated)
+            )
         self.write(
             {
                 "kind": "decision",
@@ -135,6 +139,7 @@ def traced_diffuse(self, *args, **kwargs):
         )
         hook = HookRegistry.get_or_create(self.transformer).get_hook("teacache")
         hook.mode = control["mode"]
+        hook.cache_warmup_steps = control.get("cache_warmup_steps", 0)
         hook.request_name = control["name"]
         hook.log = Path(os.environ["WAN_TRACE_DIR"]) / control["mode"] / f"rank-{torch.distributed.get_rank()}.jsonl"
         hook.log.parent.mkdir(parents=True, exist_ok=True)
