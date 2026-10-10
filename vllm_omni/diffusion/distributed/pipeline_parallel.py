@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM-Omni project
 
 from functools import wraps
-from typing import Any
+from typing import Any, cast
 
 import torch
 from vllm.v1.worker.gpu_worker import AsyncIntermediateTensors
@@ -236,14 +236,16 @@ class PipelineParallelMixin:
             # First / middle rank: run partial forwards and propagate ITs downstream.
             for branch, kwargs, it in zip(branches, all_kwargs, its):
                 result = CFGParallelMixin._predict_noise_for_cfg_branch(
-                    self, branch, {**kwargs, "intermediate_tensors": it}
+                    cast(CFGParallelMixin, self), branch, {**cast(dict[str, Any], kwargs), "intermediate_tensors": it}
                 )
                 self._pp_send_work.extend(pp_group.isend_tensor_dict(result.tensors))
             return None
 
         # Last rank: run full forward
         noise_preds = [
-            CFGParallelMixin._predict_noise_for_cfg_branch(self, branch, {**kwargs, "intermediate_tensors": it})
+            CFGParallelMixin._predict_noise_for_cfg_branch(
+                cast(CFGParallelMixin, self), branch, {**cast(dict[str, Any], kwargs), "intermediate_tensors": it}
+            )
             for branch, kwargs, it in zip(branches, all_kwargs, its)
         ]
 
