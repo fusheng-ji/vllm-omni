@@ -1,0 +1,77 @@
+{
+  "threshold": 0.07,
+  "warmup_steps": 0,
+  "source": "/data/wrd/projects/students/wenbo.ji/egocentric_video_generation/wan-teacache-validation/campaign-1095894/tune-0.07/cache/comparison.json",
+  "metrics": {
+    "mean_ssim": 0.9880297680695852,
+    "min_video_ssim": 0.9711831212043762,
+    "mean_temporal_error_ratio": 0.20030922877291837,
+    "latency_ratio": 1.0169694812229053,
+    "videos": [
+      {
+        "name": "00-17",
+        "ssim": 0.9881631135940552,
+        "temporal_error_ratio": 0.2342638522386551
+      },
+      {
+        "name": "00-29",
+        "ssim": 0.9937083125114441,
+        "temporal_error_ratio": 0.29254063963890076
+      },
+      {
+        "name": "01-17",
+        "ssim": 0.9901009798049927,
+        "temporal_error_ratio": 0.131129652261734
+      },
+      {
+        "name": "01-29",
+        "ssim": 0.9912073612213135,
+        "temporal_error_ratio": 0.13132770359516144
+      },
+      {
+        "name": "02-17",
+        "ssim": 0.9711831212043762,
+        "temporal_error_ratio": 0.2868707478046417
+      },
+      {
+        "name": "02-29",
+        "ssim": 0.9821274876594543,
+        "temporal_error_ratio": 0.29925817251205444
+      },
+      {
+        "name": "03-17",
+        "ssim": 0.9925835728645325,
+        "temporal_error_ratio": 0.18281587958335876
+      },
+      {
+        "name": "03-29",
+        "ssim": 0.9885293245315552,
+        "temporal_error_ratio": 0.30057597160339355
+      },
+      {
+        "name": "04-17",
+        "ssim": 0.9828183650970459,
+        "temporal_error_ratio": 0.15126562118530273
+      },
+      {
+        "name": "04-29",
+        "ssim": 0.9906923770904541,
+        "temporal_error_ratio": 0.14625902473926544
+      },
+      {
+        "name": "05-17",
+        "ssim": 0.9927553534507751,
+        "temporal_error_ratio": 0.11333592981100082
+      },
+      {
+        "name": "05-29",
+        "ssim": 0.9924878478050232,
+        "temporal_error_ratio": 0.13406755030155182
+      }
+    ],
+    "passed": false
+  },
+  "gate_score": 2.0030922877291837,
+  "calibration_all_gates_passed": false,
+  "diagnostic_only": true
+}
