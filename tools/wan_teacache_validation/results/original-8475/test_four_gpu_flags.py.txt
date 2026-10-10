@@ -1,0 +1,54 @@
+from types import SimpleNamespace
+import pytest
+import torch
+from tests.diffusion.distributed import test_pipeline_parallel as pp
+from tests.helpers.distributed import start_collective_workers
+from vllm.utils.network_utils import get_file_store_init_method
+
+CONFIG = dict(num_layers=4, dim=64, batch_size=2, model_seed=42, input_seed=100, cfg_scale=7.5)
+
+
+def worker(rank, init_method, dtype, expected):
+    device = pp.init_dist(rank, 4, init_method, "cuda")
+    pp.initialize_model_parallel(pipeline_parallel_size=2, cfg_parallel_size=2, backend="nccl")
+    try:
+        pipeline, positive, negative = pp.make_pipeline_and_inputs(CONFIG, dtype, device, do_true_cfg=True)
+        pipeline.transformer = SimpleNamespace()
+        original = pipeline.predict_noise
+        seen = []
+        expected_flag = None
+        def checked(**kwargs):
+            flag = getattr(pipeline.transformer, "do_true_cfg", None)
+            assert flag is expected_flag, (rank, flag, expected_flag)
+            seen.append(flag)
+            return original(**kwargs)
+        pipeline.predict_noise = checked
+        with torch.inference_mode():
+            for enabled in (True, False, True):
+                expected_flag = enabled
+                out = pipeline.predict_noise_maybe_with_cfg(
+                    do_true_cfg=enabled, true_cfg_scale=CONFIG["cfg_scale"],
+                    positive_kwargs=positive, negative_kwargs=negative if enabled else None,
+                    cfg_normalize=False,
+                )
+                pipeline._sync_pp_send()
+                if pp.get_pp_group().is_last_rank:
+                    tol = 1e-2 if dtype == torch.bfloat16 else 1e-5
+                    torch.testing.assert_close(out.cpu(), expected[enabled], rtol=tol, atol=tol)
+                else:
+                    assert out is None
+                torch.distributed.barrier()
+        assert seen == [True, False, True], (rank, seen)
+        identities = [None] * 4
+        identity = (pp.get_pp_group().rank_in_group, pp.get_classifier_free_guidance_rank())
+        torch.distributed.all_gather_object(identities, identity)
+        assert set(identities) == {(0, 0), (0, 1), (1, 0), (1, 1)}
+        print(f"rank={rank} pp/cfg={identity} dtype={dtype} flags={seen} PASS", flush=True)
+    finally:
+        pp._cleanup_distributed()
+
+
+@pytest.mark.parametrize("dtype", [torch.float32, torch.bfloat16])
+def test_four_rank_cfg_transitions(dtype):
+    expected = {enabled: pp.compute_single_gpu_baseline(CONFIG, dtype, enabled, "cuda") for enabled in (True, False)}
+    start_collective_workers(worker, args=(get_file_store_init_method(), dtype, expected), nprocs=4, device_kind="cuda")

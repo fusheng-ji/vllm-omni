@@ -1,0 +1,447 @@
+{
+  "args": {
+    "pp": 1,
+    "cfg": 2,
+    "mode": "cache",
+    "out": "/data/wrd/projects/students/wenbo.ji/egocentric_video_generation/wan-teacache-validation/validation-1096033/held-out",
+    "split": "validation",
+    "threshold": 0.07,
+    "cache_warmup_steps": 0,
+    "paired": true,
+    "limit": null
+  },
+  "records": [
+    {
+      "name": "00-101",
+      "prompt": "A yellow tram passes through a rainy European street.",
+      "seed": 101,
+      "seconds": 2.266274058027193,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "00-202",
+      "prompt": "A yellow tram passes through a rainy European street.",
+      "seed": 202,
+      "seconds": 1.813197494018823,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "00-303",
+      "prompt": "A yellow tram passes through a rainy European street.",
+      "seed": 303,
+      "seconds": 1.8320529690245166,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "01-101",
+      "prompt": "Two penguins waddle across fresh snow.",
+      "seed": 101,
+      "seconds": 1.6829790849005803,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "01-202",
+      "prompt": "Two penguins waddle across fresh snow.",
+      "seed": 202,
+      "seconds": 1.8531349010299891,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "01-303",
+      "prompt": "Two penguins waddle across fresh snow.",
+      "seed": 303,
+      "seconds": 1.7637097890255973,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "02-101",
+      "prompt": "A violinist plays beside an open window.",
+      "seed": 101,
+      "seconds": 1.6134972299914807,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "02-202",
+      "prompt": "A violinist plays beside an open window.",
+      "seed": 202,
+      "seconds": 1.6068675639107823,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "02-303",
+      "prompt": "A violinist plays beside an open window.",
+      "seed": 303,
+      "seconds": 1.6829285270068794,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "03-101",
+      "prompt": "A sea turtle swims through clear blue water.",
+      "seed": 101,
+      "seconds": 1.8054154699202627,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "03-202",
+      "prompt": "A sea turtle swims through clear blue water.",
+      "seed": 202,
+      "seconds": 1.611507419962436,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "03-303",
+      "prompt": "A sea turtle swims through clear blue water.",
+      "seed": 303,
+      "seconds": 1.6761849659960717,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "04-101",
+      "prompt": "A white scarf flutters on a clothesline.",
+      "seed": 101,
+      "seconds": 1.6162568179424852,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "04-202",
+      "prompt": "A white scarf flutters on a clothesline.",
+      "seed": 202,
+      "seconds": 1.6594817820005119,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "04-303",
+      "prompt": "A white scarf flutters on a clothesline.",
+      "seed": 303,
+      "seconds": 1.710798659012653,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "05-101",
+      "prompt": "A red panda climbs a leafy tree branch.",
+      "seed": 101,
+      "seconds": 1.6198407569900155,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "05-202",
+      "prompt": "A red panda climbs a leafy tree branch.",
+      "seed": 202,
+      "seconds": 1.6256634530145675,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "05-303",
+      "prompt": "A red panda climbs a leafy tree branch.",
+      "seed": 303,
+      "seconds": 1.624879588955082,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "06-101",
+      "prompt": "A baker pours flour into a mixing bowl.",
+      "seed": 101,
+      "seconds": 1.6336120519554242,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "06-202",
+      "prompt": "A baker pours flour into a mixing bowl.",
+      "seed": 202,
+      "seconds": 1.609901070012711,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "06-303",
+      "prompt": "A baker pours flour into a mixing bowl.",
+      "seed": 303,
+      "seconds": 1.6299777099629864,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "07-101",
+      "prompt": "A hot air balloon floats above a desert.",
+      "seed": 101,
+      "seconds": 1.6129671649541706,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "07-202",
+      "prompt": "A hot air balloon floats above a desert.",
+      "seed": 202,
+      "seconds": 1.6325311379041523,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "07-303",
+      "prompt": "A hot air balloon floats above a desert.",
+      "seed": 303,
+      "seconds": 1.616526047931984,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "08-101",
+      "prompt": "A silver fish swims among aquarium plants.",
+      "seed": 101,
+      "seconds": 1.6265696509508416,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "08-202",
+      "prompt": "A silver fish swims among aquarium plants.",
+      "seed": 202,
+      "seconds": 1.628064880031161,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "08-303",
+      "prompt": "A silver fish swims among aquarium plants.",
+      "seed": 303,
+      "seconds": 1.6333491869736463,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "09-101",
+      "prompt": "A person folds a paper crane on a desk.",
+      "seed": 101,
+      "seconds": 1.6402753550792113,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "09-202",
+      "prompt": "A person folds a paper crane on a desk.",
+      "seed": 202,
+      "seconds": 1.6093719819327816,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "09-303",
+      "prompt": "A person folds a paper crane on a desk.",
+      "seed": 303,
+      "seconds": 1.607469849055633,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "10-101",
+      "prompt": "Sunlight flickers through palm leaves in the wind.",
+      "seed": 101,
+      "seconds": 1.6039606529520825,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "10-202",
+      "prompt": "Sunlight flickers through palm leaves in the wind.",
+      "seed": 202,
+      "seconds": 1.6069358319509774,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "10-303",
+      "prompt": "Sunlight flickers through palm leaves in the wind.",
+      "seed": 303,
+      "seconds": 1.6020391860511154,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "11-101",
+      "prompt": "A toy truck drives around a circular track.",
+      "seed": 101,
+      "seconds": 1.6166229270165786,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "11-202",
+      "prompt": "A toy truck drives around a circular track.",
+      "seed": 202,
+      "seconds": 1.6249910530168563,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    },
+    {
+      "name": "11-303",
+      "prompt": "A toy truck drives around a circular track.",
+      "seed": 303,
+      "seconds": 1.638843159074895,
+      "shape": [
+        17,
+        512,
+        512,
+        3
+      ]
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "sha": "ef6379755f1f12a64a41336efa70b62e43b933f6",
+  "job_id": "1096032",
+  "torch": "2.13.0+cu130",
+  "cuda": "13.0",
+  "source_hashes": {
+    "vllm_omni/diffusion/models/wan2_2/wan2_2_transformer.py": "007848fb84a69664a38de023cdbdd6867f29d9fdc8417ebc0b67f9051a6ce954",
+    "vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2.py": "47427dc0fadf38b8a393e1045a1b79b8de2f52f9c291d843473d8bf0ce16c497",
+    "vllm_omni/diffusion/cache/teacache/hook.py": "60ab3ee9a3b38e12c1a10b10574a5b253a23c1820adb78562edc899366e882d3",
+    "vllm_omni/diffusion/cache/teacache/extractors.py": "cd91de15b16f5de0c65208013dd1f4a76fb345189daaae202fed4947427e9221",
+    "vllm_omni/diffusion/cache/teacache/backend.py": "c5e05778dcddaf64ced978090a074965cc0ce93a757ab1552bb1e2827f8febe8",
+    "vllm_omni/diffusion/distributed/pipeline_parallel.py": "2e85707f61a3bb710d75da3b2c5ec9b208cc9232e888d84585b1fb272ebdf5b5"
+  },
+  "driver_hash": "946d303b7e01c6dd5dfdbf546b7e324245e66c0669ab3da5247054464add7489",
+  "harness_hashes": {
+    "fit.py": "07caf9dfb7fc8b704c4006d82bcd533f43766426281ddb8a6e06fe34fc933a95",
+    "generate.py": "946d303b7e01c6dd5dfdbf546b7e324245e66c0669ab3da5247054464add7489",
+    "refine.py": "e35c379f5b9d29d0d0a6b45b5e3d552cc3a373222d477f7ac25a8b9911b2fa1c",
+    "freeze.py": "9bff691aa4f1adf47eb042cb2a91d838495be72dd17f52cf7386eb08428749d0",
+    "sitecustomize.py": "ea29d3248134590d2cad9077ca80049e321de3d63e95d01af2c40560641993d0",
+    "campaign.py": "42ed4f69216856f0a87afec7ee0c35fe60f7db27437cfd343ca6a7db15b1ea22",
+    "compare.py": "a0f7aaa01f3d6f3d9f6626004e99459c4f4ad98df72c06cbbc9b476cd2622510",
+    "wan_instrument.py": "18c4fed112ab5eea143b4edfe399e52d3d57f7aa48b0615282da03cec1a472e9",
+    "quality_junit.py": "54d08ef81bc2eee22d3e430d5c38a3526b775505034ccc0fc77aeca85a8a4e53",
+    "audit.py": "8e366269d246f0ecb2369c253fcd77bd222b5e2df0646c592f31d11c95675bf8"
+  }
+}

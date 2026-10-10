@@ -2,8 +2,8 @@
 
 These scripts are an experimental calibration harness, not a production-quality
 claim. The traced cache path additionally clamps negative polynomial predictions
-and rejects distances beyond the calibration range. Until those policies and
-stage-specific profiles are integrated into the production backend and validated,
+and forces full computation above the largest calibrated input distance. Until those
+policies and stage-specific profiles are integrated into the production backend and validated,
 a passing harness run alone does not qualify the production backend.
 
 ## Inputs
