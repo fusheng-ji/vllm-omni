@@ -162,7 +162,7 @@ def enable_kandinsky6_teacache(pipeline: Any, config: DiffusionCacheConfig) -> N
 
 
 def enable_wan_teacache(pipeline: Any, config: DiffusionCacheConfig) -> None:
-    """Enable stage-local caching for the validated Wan 1.3B T2V topology."""
+    """Enable experimental stage-local caching for Wan 1.3B T2V."""
     import torch
 
     parallel = pipeline.od_config.parallel_config
@@ -189,7 +189,7 @@ def enable_wan_teacache(pipeline: Any, config: DiffusionCacheConfig) -> None:
     ):
         raise ValueError("Wan TeaCache requires BF16, PP/CFG sizes 1 or 2, TP=SP=1 and no quantization")
     if config.coefficients is None:
-        raise ValueError("Wan TeaCache defaults are pending calibration; explicit coefficients are required")
+        raise ValueError("Wan TeaCache has no qualified default profile; explicit experimental coefficients are required")
     apply_teacache_hook(
         transformer,
         TeaCacheConfig(
