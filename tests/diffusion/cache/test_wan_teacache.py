@@ -14,7 +14,10 @@ from vllm_omni.diffusion.data import DiffusionCacheConfig
 
 @pytest.mark.core_model
 @pytest.mark.cpu
-@pytest.mark.parametrize("attribute,value", [("has_transformer_2", True), ("expand_timesteps", True), ("is_dmd", True)])
+@pytest.mark.parametrize(
+    "attribute,value",
+    [("has_transformer_2", True), ("expand_timesteps", True), ("is_dmd", True), ("transformer", None)],
+)
 def test_wan_rejects_unvalidated_variants(attribute, value):
     from vllm_omni.diffusion.cache.teacache.backend import enable_wan_teacache
 
