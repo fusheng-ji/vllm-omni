@@ -28,6 +28,7 @@ def main():
     p.add_argument("--out", type=Path, required=True)
     p.add_argument("--split", choices=["smoke", "calibration", "validation"], default="smoke")
     p.add_argument("--threshold", type=float, default=0.2)
+    p.add_argument("--cache-warmup-steps", type=int, default=0)
     p.add_argument("--paired", action="store_true")
     p.add_argument("--limit", type=int)
     a = p.parse_args()
@@ -101,7 +102,7 @@ def main():
             if os.environ.get("WAN_CONTROL"):
                 control = Path(os.environ["WAN_CONTROL"])
                 tmp = control.with_suffix(".tmp")
-                tmp.write_text(json.dumps({"mode": mode, "name": name}))
+                tmp.write_text(json.dumps({"mode": mode, "name": name, "cache_warmup_steps": a.cache_warmup_steps}))
                 tmp.replace(control)
             params = OmniDiffusionSamplingParams(
                 height=side,

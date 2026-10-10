@@ -75,6 +75,13 @@ if a.phase == "calibrate":
         json.dumps({"threshold": threshold, "calibration_latency_ratio": ratio}, indent=2)
     )
 else:
-    threshold = json.loads((root / f"selection-pp{a.pp}.json").read_text())["threshold"]
-    out = run("held-out", "cache", "validation", ("--paired", "--threshold", threshold), coeff)
+    selection = json.loads((root / f"selection-pp{a.pp}.json").read_text())
+    threshold = selection["threshold"]
+    out = run(
+        "held-out",
+        "cache",
+        "validation",
+        ("--paired", "--threshold", threshold, "--cache-warmup-steps", selection.get("warmup_steps", 0)),
+        coeff,
+    )
     subprocess.run([sys.executable, str(scripts / "compare.py"), str(out / "none"), str(out / "cache")], check=True)
