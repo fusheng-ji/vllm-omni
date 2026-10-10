@@ -44,7 +44,7 @@ The generator alternates native and cached requests in a single loaded model,
 warms up both paths, and excludes loading, warmup and output serialization from
 request timing. It saves float output arrays, MP4, first/middle/last frames, final
 latents and real-hook per-rank decisions. `audit.py` checks first-call computation,
-CFG rank/branch mapping, finite paired latents and actual skips. Trace I/O remains
+CFG rank/branch mapping, finite paired latents and actual skips. Rank-trace I/O and final-latent capture remain
 inside request timing. Inspect videos as well as automated measurements.
 
 `comparison.json` records mean frame SSIM, worst video mean SSIM, mean temporal

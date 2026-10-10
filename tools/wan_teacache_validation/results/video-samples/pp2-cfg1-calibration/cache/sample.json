@@ -1,0 +1,12 @@
+{
+  "name": "00-17",
+  "prompt": "A red sailboat glides across a calm lake at sunrise.",
+  "seed": 17,
+  "seconds": 3.6051252745091915,
+  "shape": [
+    17,
+    512,
+    512,
+    3
+  ]
+}

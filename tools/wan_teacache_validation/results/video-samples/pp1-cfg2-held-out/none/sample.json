@@ -1,0 +1,12 @@
+{
+  "name": "00-101",
+  "prompt": "A yellow tram passes through a rainy European street.",
+  "seed": 101,
+  "seconds": 2.266274058027193,
+  "shape": [
+    17,
+    512,
+    512,
+    3
+  ]
+}
