@@ -118,6 +118,10 @@ latents, float decoded arrays, MP4s and frames 0/8/16 are preserved under:
   validation-<job>/held-out/{none,cache,trace}/
 ```
 
+[Video and frame samples](video-samples/) include a real PP2/CFG1 calibration
+run with actual cache reuse and a PP1/CFG2 held-out run. They are explicitly
+labeled by split and must not be treated as four-card held-out acceptance.
+
 Large weights, latent tensors and float frame arrays are intentionally kept in the
 shared validation directory. Committed reports retain source provenance and
 numerical results; pending jobs must finish before the four-topology held-out
