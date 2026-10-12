@@ -99,20 +99,23 @@ if a.phase == "calibrate":
     out = run("collect", "collect", "calibration")
     subprocess.run([sys.executable, str(scripts / "fit.py"), str(out / "trace" / "collect"), str(coeff)], check=True)
     candidates = []
-    for threshold in (0.025, 0.05, 0.1, 0.2):
-        metric, passed = measure_candidate(f"tune-{threshold}", "calibration", threshold)
-        if passed:
-            candidates.append((metric["latency_ratio"], threshold))
+    # Include the historical PP=2 warmup strategy, but select using only the
+    # complete calibration set and the unchanged gates.
+    for warmup in (0, 30):
+        for threshold in (0.025, 0.05, 0.07, 0.1, 0.2):
+            metric, passed = measure_candidate(f"warmup-{warmup}/tune-{threshold}", "calibration", threshold, warmup)
+            if passed:
+                candidates.append((metric["latency_ratio"], threshold, warmup))
     if not candidates:
         raise RuntimeError(
             "No calibration candidate met all quality/cache-use/performance gates; do not run held-out acceptance"
         )
-    ratio, threshold = min(candidates)
+    ratio, threshold, warmup = min(candidates)
     (root / f"selection-pp{a.pp}.json").write_text(
         json.dumps(
             {
                 "threshold": threshold,
-                "warmup_steps": 0,
+                "warmup_steps": warmup,
                 "calibration_latency_ratio": ratio,
                 "calibration_all_gates_passed": True,
                 "diagnostic_only": False,

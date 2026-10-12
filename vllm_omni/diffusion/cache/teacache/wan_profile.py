@@ -34,7 +34,8 @@ def stage_config(
             actual_revision = resolved.name
         else:
             metadata = path / ".cache/huggingface/download/model_index.json.metadata"
-            actual_revision = metadata.read_text().splitlines()[0] if metadata.is_file() else None
+            metadata_lines = metadata.read_text().splitlines() if metadata.is_file() else []
+            actual_revision = metadata_lines[0] if metadata_lines else None
         if actual_revision != WAN_MODEL_REVISION:
             raise ValueError("Local Wan model must retain its pinned Hugging Face snapshot/download metadata")
     elif model != WAN_MODEL_ID or revision != WAN_MODEL_REVISION:
