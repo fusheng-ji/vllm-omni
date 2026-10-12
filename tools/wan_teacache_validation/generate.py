@@ -31,7 +31,11 @@ def main():
     p.add_argument("--cache-warmup-steps", type=int, default=0)
     p.add_argument("--paired", action="store_true")
     p.add_argument("--limit", type=int)
+    p.add_argument("--trace-detail", choices=["detailed", "minimal"], default="detailed")
     a = p.parse_args()
+    os.environ["WAN_TRACE_DETAIL"] = a.trace_detail
+    if a.mode == "collect" and a.trace_detail != "detailed":
+        p.error("Calibration collection requires detailed traces")
     root = Path(os.environ.get("WAN_VALIDATION_ROOT", Path(__file__).parent))
     a.out.mkdir(parents=True, exist_ok=True)
     source = Path(__import__("vllm_omni").__file__).resolve().parent.parent
@@ -47,6 +51,7 @@ def main():
         "sha": subprocess.check_output(["git", "-C", str(source), "rev-parse", "HEAD"], text=True).strip(),
         "job_id": os.environ.get("SLURM_JOB_ID"),
         "torch": torch.__version__,
+        "trace_detail": a.trace_detail,
         "cuda": torch.version.cuda,
         "source_hashes": {name: hashlib.sha256((source / name).read_bytes()).hexdigest() for name in tracked},
         "driver_hash": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
@@ -71,7 +76,30 @@ def main():
         ring_degree=1,
         enforce_eager=True,
     )
-    if a.mode != "none":
+    if a.mode == "cache":
+        coefficients_path = Path(os.environ["WAN_COEFFICIENTS"])
+        coefficients = json.loads(coefficients_path.read_text())
+        fit = json.loads(coefficients_path.with_suffix(".fit.json").read_text())
+        model_manifest = json.loads((root / "model.json").read_text())
+        profile = {
+            "model_id": model_manifest["repo_id"],
+            "revision": model_manifest["revision"],
+            "dtype": "bfloat16",
+            "pp_size": a.pp,
+            "cfg_size": a.cfg,
+            "stages": {
+                str(rank): {
+                    "coefficients": coefficients[str(rank)],
+                    "max_input_distance": fit[str(rank)]["x_max"],
+                    "threshold": a.threshold,
+                    "warmup_steps": a.cache_warmup_steps,
+                }
+                for rank in range(a.pp)
+            },
+        }
+        kw.update(cache_backend="tea_cache", cache_config={"wan_profile": profile})
+        (a.out / "production-profile.json").write_text(json.dumps(profile, indent=2))
+    elif a.mode != "none":
         kw.update(
             cache_backend="tea_cache", cache_config={"rel_l1_thresh": a.threshold, "coefficients": [0, 0, 0, 0, 1]}
         )
@@ -150,7 +178,7 @@ def main():
                     json.dumps({"args": {**vars(a), "out": str(a.out)}, "records": records}, indent=2)
                 )
             print(json.dumps({"name": name, "seconds": elapsed, "shape": list(images.shape)}), flush=True)
-        if a.mode != "none":
+        if a.mode != "none" and a.trace_detail == "detailed":
             assert any(Path(os.environ["WAN_TRACE_DIR"]).rglob("rank-*.jsonl")), "Missing real-hook worker traces"
     finally:
         omni.close()

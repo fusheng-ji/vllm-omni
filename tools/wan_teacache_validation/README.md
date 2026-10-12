@@ -1,10 +1,17 @@
 # Wan TeaCache validation
 
-These scripts are an experimental calibration harness, not a production-quality
-claim. The traced cache path additionally clamps negative polynomial predictions
-and forces full computation above the largest calibrated input distance. Until those
-policies and stage-specific profiles are integrated into the production backend and validated,
-a passing harness run alone does not qualify the production backend.
+These scripts remain experimental: no production-qualified default is registered.
+Cached runs pass an explicit `cache_config.wan_profile` through the production
+backend. That profile binds the pinned model revision, BF16 dtype, PP/CFG topology,
+and every stage's polynomial, input-distance bound, threshold and warmup steps.
+The production hook clamps negative predictions and computes fully outside the
+calibrated range. The observer no longer overrides those cache decisions.
+
+Use `generate.py --trace-detail minimal` for a separate timing run: it suppresses
+per-step trace writes and final-latent capture. Detailed runs remain required for
+cache-use and latent audits; minimal runs do not supply that evidence. Historical
+results below predate this production-path integration and are not reclassified
+as passing results.
 
 Generated outputs belong under an external `WAN_VALIDATION_ROOT`, outside the
 source checkout. See the [evidence summary](results/README.md) for the archived
@@ -53,12 +60,16 @@ The generator alternates native and cached requests in a single loaded model,
 warms up both paths, and excludes loading, warmup and output serialization from
 request timing. It saves float output arrays, MP4, first/middle/last frames, final
 latents and real-hook per-rank decisions. `audit.py` checks first-call computation,
-CFG rank/branch mapping, finite paired latents and actual skips. Rank-trace I/O and final-latent capture remain
-inside request timing. Inspect videos as well as automated measurements.
+CFG rank/branch mapping, finite paired latents and actual skips. Detailed diagnostic timing includes rank-trace I/O and latent capture.
+The campaign separately runs qualifying candidates with minimal tracing for
+acceptance timing. Inspect videos as well as automated measurements.
 
 `comparison.json` records mean frame SSIM, worst video mean SSIM, mean temporal
 change error relative to native temporal change, and cached/native latency ratio.
-Acceptance requires respectively >=0.95, >=0.90, <=0.10 and <=0.90. A failed gate
+Acceptance requires respectively >=0.95, >=0.90, <=0.10 and <=0.90.
+Calibration evaluates the complete 24-prompt, two-seed split. Independent
+validation refuses diagnostic or otherwise unqualified selections. Existing
+experiment directories are never overwritten by a campaign retry. A failed gate
 must remain visible; unsuccessful measurements must not be described as production
 acceptance. The `smoke` split uses 5 frames at 256x256 and is only a startup test.
 
@@ -109,7 +120,8 @@ acceptance limit. This metric can detect differences even when both videos look
 smooth. No claim of visible flicker should be inferred solely from it.
 
 Latency is the ratio of total cached to total native request time over equal
-request sets, including tracing overhead. Loading, warmup, image/video export and
+request sets. Historical and detailed diagnostic measurements include trace
+overhead; new campaign acceptance uses the separately recorded minimal-trace run. Loading, warmup, image/video export and
 metric computation are excluded. `hits` counts reuse of the entire local block
 stack, not individual layers. The audit verifies that each new request starts at
 step zero with full computation, validates CFG branch mapping, and reports paired
