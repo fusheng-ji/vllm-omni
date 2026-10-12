@@ -7,7 +7,6 @@ import json
 import os
 from pathlib import Path
 
-import numpy as np
 import torch
 
 from vllm_omni.diffusion.cache.teacache import backend
@@ -26,17 +25,10 @@ class TracedHook(TeaCacheHook):
         self.pp_rank = get_pp_group().rank_in_group
         self.cfg_rank = get_classifier_free_guidance_rank()
         self.mode = os.environ["WAN_TRACE_MODE"]
+        self.detailed = os.environ.get("WAN_TRACE_DETAIL", "detailed") == "detailed"
         self.root = Path(os.environ["WAN_TRACE_DIR"])
         self.root.mkdir(parents=True, exist_ok=True)
         self.log = self.root / f"rank-{torch.distributed.get_rank()}.jsonl"
-        if self.mode == "cache":
-            coefficients = json.loads(Path(os.environ["WAN_COEFFICIENTS"]).read_text())
-            polynomial = np.poly1d(coefficients[str(self.pp_rank)])
-            fit = json.loads(Path(os.environ["WAN_COEFFICIENTS"]).with_suffix(".fit.json").read_text())
-            upper = fit[str(self.pp_rank)]["x_max"]
-            self.rescale_func = lambda distance: (
-                self.config.rel_l1_thresh + 1 if distance > upper else max(0.0, float(polynomial(distance)))
-            )
         extractor = self.extractor_fn
 
         def extract(module, *args, **kwargs):
@@ -82,6 +74,8 @@ class TracedHook(TeaCacheHook):
         return super().new_forward(module, *args, **kwargs)
 
     def write(self, row):
+        if not self.detailed:
+            return
         row["request_name"] = getattr(self, "request_name", "engine-warmup")
         with self.log.open("a") as f:
             f.write(json.dumps(row) + "\n")
@@ -92,13 +86,9 @@ class TracedHook(TeaCacheHook):
         self.branch_states[branch] = state
         if state.cnt == 0:
             assert state.previous_residual is None, "Residual leaked across requests"
-        if state.cnt < getattr(self, "cache_warmup_steps", 0):
-            state.accumulated_rel_l1_distance = 0.0
-            compute = True
-        else:
-            compute = (
-                True if self.mode in ("collect", "full") else super()._should_compute_full_transformer(state, modulated)
-            )
+        compute = (
+            True if self.mode in ("collect", "full") else super()._should_compute_full_transformer(state, modulated)
+        )
         self.write(
             {
                 "kind": "decision",
@@ -146,11 +136,12 @@ def traced_diffuse(self, *args, **kwargs):
         )
         hook = HookRegistry.get_or_create(self.transformer).get_hook("teacache")
         hook.mode = control["mode"]
-        hook.cache_warmup_steps = control.get("cache_warmup_steps", 0)
         hook.request_name = control["name"]
         hook.log = Path(os.environ["WAN_TRACE_DIR"]) / control["mode"] / f"rank-{torch.distributed.get_rank()}.jsonl"
         hook.log.parent.mkdir(parents=True, exist_ok=True)
     latent = _original_diffuse(self, *args, **kwargs)
+    if os.environ.get("WAN_TRACE_DETAIL", "detailed") != "detailed":
+        return latent
     rank = torch.distributed.get_rank() if torch.distributed.is_initialized() else 0
     if rank == 0:
         if not isinstance(latent, torch.Tensor) and hasattr(latent, "resolve"):

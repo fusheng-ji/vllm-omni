@@ -33,12 +33,23 @@ def main():
             failures += 1
             relation = ">=" if lower_bound else "<="
             ET.SubElement(case, "failure", message=f"{value:.8g}; required {relation} {threshold}")
+    extra_checks = [name for name in ("cache_use_passed", "timing_quality_passed") if name in metrics]
+    for name in extra_checks:
+        case = ET.SubElement(suite, "testcase", classname=name, name=name)
+        if not metrics[name]:
+            failures += 1
+            ET.SubElement(case, "failure", message=f"{name} was false")
+    suite.set("tests", str(4 + len(extra_checks)))
     suite.set("failures", str(failures))
     properties = ET.SubElement(suite, "properties")
     ET.SubElement(properties, "property", name="comparison", value=str(args.comparison))
     ET.SubElement(properties, "property", name="videos", value=str(len(metrics["videos"])))
     ET.ElementTree(suite).write(args.output, encoding="utf-8", xml_declaration=True)
-    print(json.dumps({"passed": 4 - failures, "failed": failures, "skipped": 0, "report": str(args.output)}))
+    print(
+        json.dumps(
+            {"passed": 4 + len(extra_checks) - failures, "failed": failures, "skipped": 0, "report": str(args.output)}
+        )
+    )
 
 
 if __name__ == "__main__":

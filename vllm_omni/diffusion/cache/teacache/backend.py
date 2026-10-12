@@ -190,6 +190,22 @@ def enable_wan_teacache(pipeline: Any, config: DiffusionCacheConfig) -> None:
         or transformer.dtype != torch.bfloat16
     ):
         raise ValueError("Wan TeaCache requires BF16, PP/CFG sizes 1 or 2, TP=SP=1 and no quantization")
+    if config.wan_profile is not None:
+        from vllm_omni.diffusion.cache.teacache.wan_profile import stage_config
+        from vllm_omni.diffusion.distributed.parallel_state import get_pp_group
+
+        if config.coefficients is not None or config.rel_l1_thresh is not None:
+            raise ValueError("Wan profile cannot be combined with global coefficients or threshold overrides")
+        teacache_config = stage_config(
+            config.wan_profile,
+            model=str(pipeline.od_config.model),
+            revision=pipeline.od_config.revision,
+            pp_size=parallel.pipeline_parallel_size,
+            cfg_size=parallel.cfg_parallel_size,
+            pp_rank=get_pp_group().rank_in_group,
+        )
+        apply_teacache_hook(transformer, teacache_config)
+        return
     if config.coefficients is None:
         raise ValueError(
             "Wan TeaCache has no qualified default profile; explicit experimental coefficients are required"
