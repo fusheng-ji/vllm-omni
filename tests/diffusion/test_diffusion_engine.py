@@ -75,6 +75,9 @@ class MockScheduler:
     def has_requests(self):
         return len(self._waiting_queue) > 0
 
+    def pending_finished_request_ids(self):
+        return set()
+
     def num_waiting_requests(self) -> int:
         return len(self._waiting_queue)
 
@@ -950,7 +953,7 @@ async def test_async_add_req_and_stream_response():
     await engine._check_and_start_background_loop()
 
     async def run_task(rid):
-        req = SimpleNamespace(request_id=rid)
+        req = SimpleNamespace(request_id=rid, sampling_params=OmniDiffusionSamplingParams())
         start = time.time()
         res = await _consume_final_output(engine.async_add_req_and_stream_response(req))
         return rid, res, time.time() - start
@@ -1018,6 +1021,63 @@ class TestPreTokenizedPromptContract:
         assert excinfo.value.status_code == 400
         assert "TextOnlyPipeline" in excinfo.value.message
         assert engine.scheduler._waiting_queue == []
+
+    @pytest.mark.parametrize("key", ["prompt_ids", "negative_prompt_ids"])
+    @pytest.mark.parametrize(
+        "token_ids",
+        [torch.tensor([101, 102]), torch.tensor([0]), torch.tensor(0), torch.tensor([[101, 102]])],
+        ids=["multiple-tokens", "zero-token", "scalar-zero", "batched-tokens"],
+    )
+    @pytest.mark.parametrize(
+        "entrypoint", ["add_request", "async_add_req_and_stream_response", "add_req_and_wait_for_response"]
+    )
+    def test_rejects_tensor_ids_for_pipeline_without_support(self, key, token_ids, entrypoint) -> None:
+        from vllm_omni.errors import OmniClientError
+
+        engine = self._engine(supported=False)
+
+        with pytest.raises(OmniClientError, match=key) as excinfo:
+            getattr(engine, entrypoint)(self._request({"prompt": "a cat", key: token_ids}))
+
+        assert excinfo.value.status_code == 400
+        assert engine.scheduler._waiting_queue == []
+
+    @pytest.mark.parametrize("key", ["prompt_ids", "negative_prompt_ids"])
+    @pytest.mark.parametrize(
+        "token_ids",
+        [torch.empty(0, dtype=torch.long), torch.empty((1, 0), dtype=torch.long)],
+        ids=["empty", "batched-empty"],
+    )
+    def test_admits_empty_tensor_ids(self, key, token_ids) -> None:
+        engine = self._engine(supported=False)
+
+        engine.add_request(self._request({"prompt": "a cat", key: token_ids}))
+
+        assert len(engine.scheduler._waiting_queue) == 1
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("key", ["prompt_ids", "negative_prompt_ids"])
+    @pytest.mark.parametrize("token_ids", [torch.tensor([101, 102]), torch.tensor([0])], ids=["multiple", "zero"])
+    async def test_step_streaming_rejects_tensor_ids(self, key, token_ids, mocker: MockerFixture) -> None:
+        from vllm_omni.errors import OmniClientError
+
+        engine = self._engine(supported=False)
+        mocker.patch.object(engine, "_check_and_start_background_loop", new_callable=mocker.AsyncMock)
+
+        with pytest.raises(OmniClientError, match=key) as excinfo:
+            await anext(engine.step_streaming(self._request({"prompt": "a cat", key: token_ids})))
+
+        assert excinfo.value.status_code == 400
+        assert engine.scheduler._waiting_queue == []
+
+    @pytest.mark.parametrize("supported", [True, None], ids=["declared-support", "unknown-custom"])
+    @pytest.mark.parametrize("key", ["prompt_ids", "negative_prompt_ids"])
+    def test_custom_pipeline_tensor_ids_bypass_rejection(self, supported, key) -> None:
+        engine = self._engine(supported=supported)
+
+        engine.add_request(self._request({key: torch.tensor([0, 101])}))
+
+        assert len(engine.scheduler._waiting_queue) == 1
 
     @pytest.mark.parametrize(
         "prompt",
