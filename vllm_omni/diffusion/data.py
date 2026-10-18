@@ -900,6 +900,12 @@ class OmniDiffusionConfig:
     distributed_executor_backend: str | None = None
     nccl_port: int | None = None
 
+    # Weight transfer configuration for RL training (pipeline-wide deploy
+    # field). A dict matching upstream vLLM ``WeightTransferConfig`` fields
+    # (e.g. ``{"backend": "ipc"}``); converted to the typed config when the
+    # diffusion VllmConfig is built. ``None`` disables weight transfer.
+    weight_transfer_config: dict[str, Any] | None = None
+
     # Engine backend selection, resolved by ``DiffusionEngine.resolve_engine_class``
     # (mirrors ``DiffusionExecutor.get_class``). Config files use a string:
     # "default" -> DiffusionEngine, or an import path (set e.g. by a deploy
@@ -1888,6 +1894,9 @@ class DiffusionOutput:
 
     # logged duration of stages
     stage_durations: dict[str, float] = field(default_factory=dict)
+
+    # Engine-side async materialization wait (seconds), separate from model stages.
+    output_ready_wait_time: float = 0.0
 
     # memory usage info
     peak_memory_mb: float = 0.0
