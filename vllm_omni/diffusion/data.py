@@ -114,17 +114,6 @@ def normalize_omni_diffusion_kwargs(
             fastvideo_vsa_topk=fastvideo_vsa_topk,
         )
 
-    auxiliary_text_encoder = config_kwargs.pop("auxiliary_text_encoder", None)
-    if auxiliary_text_encoder is not None:
-        extras = dict(config_kwargs.get("extras") or {})
-        if extras.get("auxiliary_text_encoder") is not None:
-            raise ValueError(
-                "Diffusion engine field 'auxiliary_text_encoder' cannot be provided both at the top level and in "
-                "'extras'."
-            )
-        extras["auxiliary_text_encoder"] = auxiliary_text_encoder
-        config_kwargs["extras"] = extras
-
     # Check environment variable as fallback for cache_backend.
     # Support both old DIFFUSION_CACHE_ADAPTER and new DIFFUSION_CACHE_BACKEND.
     if "cache_backend" not in config_kwargs and apply_defaults:
@@ -951,6 +940,7 @@ class OmniDiffusionConfig:
     # serialize it across processes; __post_init__ validates it once and caches
     # the internal typed resolution used at runtime.
     diffusion_offload_config: dict[str, Any] | None = None
+    kv_offload_config: dict[str, Any] | None = None
     # Compatibility aliases. Some model-specific legacy stage lifecycles are
     # intentionally broader than the compact dit/text_encoder selector.
     # When enabled, DiT and encoders swap GPU access (mutual exclusion):
@@ -1247,6 +1237,9 @@ class OmniDiffusionConfig:
         )
 
     def __post_init__(self):
+        from vllm_omni.diffusion.kv_offload_config import parse_reference_kv_config
+
+        parse_reference_kv_config(self.kv_offload_config)
         if self.hsdp_weight_load_strategy not in {"full", "pre_sharded"}:
             raise ValueError(
                 f"hsdp_weight_load_strategy must be 'full' or 'pre_sharded', got {self.hsdp_weight_load_strategy!r}"
@@ -1892,6 +1885,7 @@ class DiffusionOutput:
     started_event_ids: list[str] = field(default_factory=list)
     active_event_ids: list[str] = field(default_factory=list)
     completed_event_ids: list[str] = field(default_factory=list)
+    coalesced_event_ids: list[str] = field(default_factory=list)
 
     # logged duration of stages
     stage_durations: dict[str, float] = field(default_factory=dict)
@@ -2176,11 +2170,11 @@ class AttentionSpec:
                 f"quant is only supported by the TRTLLM_ATTN and FLASHINFER_ATTN backends, but "
                 f"backend={self.backend!r}. Remove quant or set a supported backend."
             )
-        if self.fastvideo_vsa_provider not in ("auto", "fastvideo", "flashinfer"):
-            raise ValueError("fastvideo_vsa_provider must be auto, fastvideo or flashinfer")
+        if self.fastvideo_vsa_provider not in ("auto", "fastvideo", "flashinfer", "cudnn", "triton"):
+            raise ValueError("fastvideo_vsa_provider must be auto, fastvideo, flashinfer, cudnn or triton")
         if self.fastvideo_vsa_precision not in ("bf16", "sage"):
             raise ValueError("fastvideo_vsa_precision must be bf16 or sage")
-        if self.fastvideo_vsa_precision == "sage" and self.fastvideo_vsa_provider == "fastvideo":
+        if self.fastvideo_vsa_precision == "sage" and self.fastvideo_vsa_provider in ("fastvideo", "cudnn", "triton"):
             raise ValueError("Sage VSA precision requires the FlashInfer provider")
         if self.backend.upper() != "FASTVIDEO_VSA" and (
             self.fastvideo_vsa_provider not in ("auto", "fastvideo") or self.fastvideo_vsa_precision != "bf16"
