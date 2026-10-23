@@ -235,7 +235,9 @@ class TeaCacheHook(ModelHook):
         """Fallback branch for callers that don't stamp ``module.cfg_branch``."""
         if not getattr(module, "do_true_cfg", False):
             return "positive"
-        if is_cfg_group_initialized() and get_classifier_free_guidance_world_size() > 1:
+        # Direct pipeline calls may not initialize a CFG process group.
+        cfg_parallel_size = get_classifier_free_guidance_world_size() if is_cfg_group_initialized() else 1
+        if cfg_parallel_size > 1:
             return "negative" if get_classifier_free_guidance_rank() > 0 else "positive"
         # Sequential CFG without a stamp: assume calls alternate on this rank.
         return "negative" if self._forward_cnt % 2 == 1 else "positive"
