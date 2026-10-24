@@ -12,7 +12,7 @@ import os
 import queue
 import threading
 import time
-from collections.abc import AsyncGenerator, Callable, Iterable, Mapping
+from collections.abc import AsyncGenerator, Callable, Iterable
 from dataclasses import dataclass, field
 from enum import Enum
 from types import AsyncGeneratorType
@@ -67,6 +67,12 @@ from vllm_omni.diffusion.registry import (
 from vllm_omni.diffusion.request import DUMMY_DIFFUSION_REQUEST_ID, OmniDiffusionRequest
 from vllm_omni.diffusion.sched import BaseScheduler, RequestScheduler, StepScheduler
 from vllm_omni.diffusion.sched.interface import CachedRequestData, DiffusionRequestStatus, DiffusionSchedulerOutput
+from vllm_omni.diffusion.utils.pipeline_utils import (
+    pipeline_supports,
+    resolve_custom_pipeline_cls,
+    supports_pre_tokenized_prompt_ids,
+)
+from vllm_omni.diffusion.utils.prompt_utils import pre_tokenized_prompt_keys
 from vllm_omni.diffusion.worker.utils import BaseRunnerOutput, BatchRunnerOutput, RunnerOutput
 from vllm_omni.errors import OmniClientError, client_error_from_metadata, is_client_error_status
 from vllm_omni.inputs.data import OmniDiffusionSamplingParams, OmniTextPrompt
@@ -147,86 +153,8 @@ def _func_accepts_parameter(func: object | None, parameter_name: str) -> bool:
     )
 
 
-def _resolve_custom_pipeline_cls(custom_pipeline_args: dict[str, Any] | None) -> type | None:
-    if not custom_pipeline_args or "pipeline_class" not in custom_pipeline_args:
-        return None
-
-    pipeline_cls = custom_pipeline_args["pipeline_class"]
-
-    if isinstance(pipeline_cls, type):
-        return pipeline_cls
-    if isinstance(pipeline_cls, str):
-        try:
-            return resolve_obj_by_qualname(pipeline_cls)
-        except (AttributeError, ImportError, ValueError) as exc:
-            raise ValueError(f"Failed to resolve custom diffusion pipeline class {pipeline_cls!r}.") from exc
-    raise TypeError(
-        f"custom_pipeline_args['pipeline_class'] must be a qualified name string or a class, "
-        f"got {type(pipeline_cls).__name__}"
-    )
-
-
-def _resolve_pipeline_cls(od_config: OmniDiffusionConfig) -> type | None:
-    """Return the pipeline class the engine will execute, or ``None`` if unknown.
-
-    A custom pipeline wins over the registry; the Diffusers adapter wins over
-    the model's native pipeline when ``diffusion_load_format="diffusers"``.
-    Capability flags (``supports_*`` class attributes) are read from this class.
-    """
-    model_cls = _resolve_custom_pipeline_cls(getattr(od_config, "custom_pipeline_args", None))
-    if model_cls is not None:
-        return model_cls
-    if uses_diffusers_adapter(od_config):
-        return DiffusionModelRegistry._try_load_model_cls("DiffusersAdapterPipeline")
-    return DiffusionModelRegistry._try_load_model_cls(getattr(od_config, "model_class_name", None))
-
-
-def _pipeline_supports(od_config: OmniDiffusionConfig, capability: str) -> bool:
-    return bool(getattr(_resolve_pipeline_cls(od_config), capability, False))
-
-
 def supports_request_batch(od_config: OmniDiffusionConfig) -> bool:
-    return _pipeline_supports(od_config, "supports_request_batch")
-
-
-def supports_pre_tokenized_prompt_ids(od_config: OmniDiffusionConfig) -> bool | None:
-    """Whether the pipeline honors ``OmniCustomPrompt.prompt_ids`` verbatim.
-
-    In-tree pipelines tokenize text themselves and never read the ids, so a
-    request that carries them would silently run unconditioned; they default
-    to ``False`` unless the class declares ``supports_pre_tokenized_prompt_ids
-    = True``. A user-supplied ``custom_pipeline_args["pipeline_class"]`` is
-    outside the engine's knowledge (RL rollouts feed exactly these ids to such
-    pipelines), so without a declaration it returns ``None`` and admission
-    skips the check; it may still declare ``False`` to opt into rejection.
-    """
-    flag = "supports_pre_tokenized_prompt_ids"
-    custom_cls = _resolve_custom_pipeline_cls(getattr(od_config, "custom_pipeline_args", None))
-    if custom_cls is not None:
-        declared = getattr(custom_cls, flag, None)
-        return None if declared is None else bool(declared)
-    return _pipeline_supports(od_config, flag)
-
-
-# ``OmniCustomPrompt`` keys that carry caller-tokenized ids. The native vLLM
-# spelling ``prompt_token_ids`` is deliberately not listed: multi-stage models
-# use it to hand an AR stage's tokens to their diffusion stage.
-_PRE_TOKENIZED_PROMPT_KEYS = ("prompt_ids", "negative_prompt_ids")
-
-
-def _pre_tokenized_prompt_keys(prompt: object) -> list[str]:
-    """Return the ``OmniCustomPrompt`` id fields a request actually populates."""
-    if not isinstance(prompt, Mapping):
-        return []
-    populated = []
-    for key in _PRE_TOKENIZED_PROMPT_KEYS:
-        token_ids = prompt.get(key)
-        if token_ids is None:
-            continue
-        size = token_ids.numel() if isinstance(token_ids, torch.Tensor) else len(token_ids)
-        if size > 0:
-            populated.append(key)
-    return populated
+    return pipeline_supports(od_config, "supports_request_batch")
 
 
 def _max_num_seqs(od_config: OmniDiffusionConfig) -> int:
@@ -238,7 +166,7 @@ def _max_num_seqs(od_config: OmniDiffusionConfig) -> int:
 
 def supports_request_cancellation(od_config: OmniDiffusionConfig) -> bool:
     """Whether the local pipeline checks cooperative cancellation boundaries."""
-    model_cls = _resolve_custom_pipeline_cls(getattr(od_config, "custom_pipeline_args", None))
+    model_cls = resolve_custom_pipeline_cls(getattr(od_config, "custom_pipeline_args", None))
     if model_cls is None:
         name = (
             "DiffusersAdapterPipeline"
@@ -1473,7 +1401,7 @@ class DiffusionEngine:
         supported = getattr(self, "_supports_pre_tokenized_prompt_ids", None)
         if supported is None or supported:
             return
-        populated = _pre_tokenized_prompt_keys(request.prompt)
+        populated = pre_tokenized_prompt_keys(request.prompt)
         if populated:
             model_name = getattr(self.od_config, "model_class_name", None) or "This diffusion pipeline"
             raise OmniClientError(

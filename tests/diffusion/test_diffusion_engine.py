@@ -14,6 +14,7 @@ import torch
 from pytest_mock import MockerFixture
 
 import vllm_omni.diffusion.diffusion_engine as diffusion_engine_module
+import vllm_omni.diffusion.utils.pipeline_utils as pipeline_utils_module
 from tests.helpers.mark import hardware_test
 from vllm_omni.diffusion.data import (
     DIFFUSION_REQUEST_LIFECYCLE_KEY,
@@ -307,7 +308,7 @@ class TestRequestBatchCapability:
         )
 
         monkeypatch.setattr(
-            diffusion_engine_module,
+            pipeline_utils_module,
             "resolve_obj_by_qualname",
             lambda qualname: _BatchCapablePipeline if qualname == "test.module.BatchPipeline" else None,
         )
@@ -368,7 +369,7 @@ class TestRequestBatchCapability:
         def fail_resolve(qualname):
             raise ImportError(qualname)
 
-        monkeypatch.setattr(diffusion_engine_module, "resolve_obj_by_qualname", fail_resolve)
+        monkeypatch.setattr(pipeline_utils_module, "resolve_obj_by_qualname", fail_resolve)
         registry_load = mocker.Mock(return_value=_BatchCapablePipeline)
         monkeypatch.setattr(
             diffusion_engine_module.DiffusionModelRegistry,
@@ -1185,9 +1186,9 @@ class TestPreTokenizedPromptContract:
         text_config = SimpleNamespace(model_class_name="TextPipeline", custom_pipeline_args=None)
         unknown_config = SimpleNamespace(model_class_name="Missing", custom_pipeline_args=None)
 
-        assert diffusion_engine_module.supports_pre_tokenized_prompt_ids(ids_config) is True
-        assert diffusion_engine_module.supports_pre_tokenized_prompt_ids(text_config) is False
-        assert diffusion_engine_module.supports_pre_tokenized_prompt_ids(unknown_config) is False
+        assert pipeline_utils_module.supports_pre_tokenized_prompt_ids(ids_config) is True
+        assert pipeline_utils_module.supports_pre_tokenized_prompt_ids(text_config) is False
+        assert pipeline_utils_module.supports_pre_tokenized_prompt_ids(unknown_config) is False
 
     def test_diffusers_adapter_capability_shadows_native_pipeline(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(
@@ -1199,7 +1200,7 @@ class TestPreTokenizedPromptContract:
             model_class_name="IdsPipeline", custom_pipeline_args=None, diffusion_load_format="diffusers"
         )
 
-        assert diffusion_engine_module.supports_pre_tokenized_prompt_ids(od_config) is False
+        assert pipeline_utils_module.supports_pre_tokenized_prompt_ids(od_config) is False
 
 
 class _UndeclaredCustomPipeline:
@@ -1230,7 +1231,7 @@ class TestPreTokenizedPromptCustomPipelines:
             custom_pipeline_args={"pipeline_class": pipeline_cls},
         )
 
-        assert diffusion_engine_module.supports_pre_tokenized_prompt_ids(od_config) is expected
+        assert pipeline_utils_module.supports_pre_tokenized_prompt_ids(od_config) is expected
 
     def test_registered_pipeline_without_flag_is_false_not_none(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(
@@ -1240,7 +1241,7 @@ class TestPreTokenizedPromptCustomPipelines:
         )
         od_config = SimpleNamespace(model_class_name="QwenImagePipeline", custom_pipeline_args=None)
 
-        assert diffusion_engine_module.supports_pre_tokenized_prompt_ids(od_config) is False
+        assert pipeline_utils_module.supports_pre_tokenized_prompt_ids(od_config) is False
 
     def test_undeclared_custom_pipeline_admits_rl_rollout_ids(self) -> None:
         """The verl-omni rollout path sends {"prompt_ids": ...} to a custom pipeline."""
@@ -1250,7 +1251,7 @@ class TestPreTokenizedPromptCustomPipelines:
             custom_pipeline_args={"pipeline_class": _UndeclaredCustomPipeline},
             enable_prefix_caching=False,
         )
-        engine._supports_pre_tokenized_prompt_ids = diffusion_engine_module.supports_pre_tokenized_prompt_ids(
+        engine._supports_pre_tokenized_prompt_ids = pipeline_utils_module.supports_pre_tokenized_prompt_ids(
             engine.od_config
         )
 
