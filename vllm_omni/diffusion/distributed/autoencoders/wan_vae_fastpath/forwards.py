@@ -569,7 +569,9 @@ def _run_norm_act_cached_conv(
                     fold_bias = return_bias and _may_defer_conv_bias(norm, x)
                     conv_bias = None if fold_bias else conv.bias
                     first_frame = None
-                    if payload is None and assembled.shape[2] == conv._padding[4] + 1:
+                    # The unfused path declines this shortcut when ``cat_time_5d`` would not
+                    # allocate a channels-last assembly, so mirror that layout test on the norm input.
+                    if payload is None and assembled.shape[2] == conv._padding[4] + 1 and suggests_channels_last(x):
                         first_frame = _first_frame_conv2d(conv, assembled[:, :, -1:], conv_bias, cache_list[index])
                     if first_frame is not None:
                         out = first_frame[0]
