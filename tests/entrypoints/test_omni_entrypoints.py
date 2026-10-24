@@ -1053,12 +1053,23 @@ def test_omni_forces_final_only_on_llm_stages(monkeypatch: pytest.MonkeyPatch):
     assert len(outputs) == 2
 
 
-def test_fatal_error_raises_engine_dead():
+@pytest.mark.parametrize("request_id", [None, "removed"])
+def test_fatal_error_raises_engine_dead(request_id: str | None):
     base = _make_base()
-    msg = ErrorMessage(error="orchestrator crashed", fatal=True)
+    msg = ErrorMessage(error="orchestrator crashed", fatal=True, request_id=request_id)
 
     with pytest.raises(EngineDeadError, match="orchestrator crashed"):
         base._handle_output_message(msg)
+
+
+def test_non_fatal_error_for_unknown_request_is_ignored():
+    base = _make_base()
+    active_state = ClientRequestState("active")
+    base.request_states["active"] = active_state
+    msg = ErrorMessage(error="cancelled request failed", request_id="removed")
+
+    assert base._handle_output_message(msg) == (True, None, None, None)
+    assert base.request_states == {"active": active_state}
 
 
 def test_non_fatal_error_raises_runtime():
@@ -1585,6 +1596,56 @@ def test_omni_generate_client_error_keeps_engine_usable(monkeypatch: pytest.Monk
 
     assert [output.stage_id for output in outputs] == [0, 2]
     assert len(engine.submitted) == 2
+
+
+@pytest.mark.parametrize("py_generator", [False, True], ids=["list", "generator"])
+@pytest.mark.parametrize(
+    ("enqueue_error", "exception_type"),
+    [
+        pytest.param(_enqueue_client_error_message, OmniClientError, id="client-error"),
+        pytest.param(_enqueue_error_message, RuntimeError, id="server-error"),
+    ],
+)
+def test_omni_generate_discards_errors_from_aborted_batch(
+    monkeypatch: pytest.MonkeyPatch,
+    py_generator: bool,
+    enqueue_error: Callable[[FakeAsyncOmniEngine, dict[str, Any]], None],
+    exception_type: type[Exception],
+):
+    def enqueue_batch_errors_then_outputs(engine: FakeAsyncOmniEngine, msg: dict[str, Any]) -> None:
+        if msg["prompt"] == "valid":
+            _enqueue_omni_final_only_outputs(engine, msg)
+        else:
+            enqueue_error(engine, msg)
+
+    engine = FakeAsyncOmniEngine(
+        stage_metadata=THREE_STAGE_META,
+        on_add_request=enqueue_batch_errors_then_outputs,
+    )
+    _patch_engine(monkeypatch, engine)
+    app = Omni("dummy-model")
+    try:
+        with pytest.raises(exception_type) as exc_info:
+            list(app.generate(["bad-1", "bad-2"], py_generator=py_generator, use_tqdm=False))
+
+        assert type(exc_info.value) is exception_type
+        assert len(engine.submitted) == 2
+        assert len(engine.aborted) == 1
+        assert set(engine.aborted[0]) == {msg["request_id"] for msg in engine.submitted}
+        assert not app.request_states
+        assert engine.output_q.qsize() == 1
+        assert not engine.shutdown_called
+
+        outputs = list(app.generate(["valid"], py_generator=py_generator, use_tqdm=False))
+
+        assert [output.stage_id for output in outputs] == [0, 2]
+        assert len(engine.submitted) == 3
+        assert len(engine.aborted) == 1
+        assert engine.output_q.empty()
+        assert not app.request_states
+        assert not engine.shutdown_called
+    finally:
+        app.shutdown()
 
 
 def test_omni_generate_server_error_keeps_engine_usable(monkeypatch: pytest.MonkeyPatch):
