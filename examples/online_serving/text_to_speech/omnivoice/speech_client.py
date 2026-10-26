@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: Copyright contributors to the vLLM-Omni project
+
 """Client for OmniVoice TTS via /v1/audio/speech endpoint.
 
 Examples:
@@ -9,6 +12,9 @@ Examples:
 
     # Use a specific uploaded/supported voice
     python speech_client.py --text "Hello" --voice my_uploaded_voice
+
+    # Clone a reference voice and let the server transcribe the reference audio
+    python speech_client.py --text "hello" --ref-audio /path/to/ref_audio.wav
 """
 
 import argparse
