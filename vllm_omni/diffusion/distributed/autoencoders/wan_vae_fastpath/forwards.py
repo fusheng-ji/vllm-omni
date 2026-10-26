@@ -384,7 +384,7 @@ def _first_frame_conv2d(
 ) -> tuple[torch.Tensor, torch.Tensor] | None:
     """Convolve ``[0, 0, x]`` with the last temporal weight slice, retaining the cache.
 
-    Called only for CUDA inference without history. The identity holds for
+    Called only for CUDA/XPU inference without history. The identity holds for
     finite operands, but Conv2d may round differently, so only the tolerance-
     based channels_last level uses it.
 
