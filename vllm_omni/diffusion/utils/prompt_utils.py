@@ -20,7 +20,11 @@ def pre_tokenized_prompt_keys(prompt: object) -> list[str]:
         token_ids = prompt.get(key)
         if token_ids is None:
             continue
-        size = token_ids.numel() if isinstance(token_ids, torch.Tensor) else len(token_ids)
+        try:
+            size = token_ids.numel() if isinstance(token_ids, torch.Tensor) else len(token_ids)
+        except TypeError:
+            # Unsized values must still reach the admission-time client error.
+            size = 1
         if size > 0:
             populated.append(key)
     return populated

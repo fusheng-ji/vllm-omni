@@ -1077,13 +1077,13 @@ class TestPreTokenizedPromptContract:
     @pytest.mark.parametrize("key", ["prompt_ids", "negative_prompt_ids"])
     @pytest.mark.parametrize(
         "token_ids",
-        [torch.tensor([101, 102]), torch.tensor([0]), torch.tensor(0), torch.tensor([[101, 102]])],
-        ids=["multiple-tokens", "zero-token", "scalar-zero", "batched-tokens"],
+        [torch.tensor([101, 102]), torch.tensor([0]), torch.tensor(0), torch.tensor([[101, 102]]), 101, 0, False],
+        ids=["multiple-tokens", "zero-token", "scalar-zero", "batched-tokens", "integer", "integer-zero", "boolean"],
     )
     @pytest.mark.parametrize(
         "entrypoint", ["add_request", "async_add_req_and_stream_response", "add_req_and_wait_for_response"]
     )
-    def test_rejects_tensor_ids_for_pipeline_without_support(self, key, token_ids, entrypoint) -> None:
+    def test_rejects_populated_ids_for_pipeline_without_support(self, key, token_ids, entrypoint) -> None:
         from vllm_omni.errors import OmniClientError
 
         engine = self._engine(supported=False)
@@ -1109,8 +1109,12 @@ class TestPreTokenizedPromptContract:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("key", ["prompt_ids", "negative_prompt_ids"])
-    @pytest.mark.parametrize("token_ids", [torch.tensor([101, 102]), torch.tensor([0])], ids=["multiple", "zero"])
-    async def test_step_streaming_rejects_tensor_ids(self, key, token_ids, mocker: MockerFixture) -> None:
+    @pytest.mark.parametrize(
+        "token_ids",
+        [torch.tensor([101, 102]), torch.tensor([0]), 101, 0, False],
+        ids=["multiple", "zero", "integer", "integer-zero", "boolean"],
+    )
+    async def test_step_streaming_rejects_populated_ids(self, key, token_ids, mocker: MockerFixture) -> None:
         from vllm_omni.errors import OmniClientError
 
         engine = self._engine(supported=False)
@@ -1124,10 +1128,13 @@ class TestPreTokenizedPromptContract:
 
     @pytest.mark.parametrize("supported", [True, None], ids=["declared-support", "unknown-custom"])
     @pytest.mark.parametrize("key", ["prompt_ids", "negative_prompt_ids"])
-    def test_custom_pipeline_tensor_ids_bypass_rejection(self, supported, key) -> None:
+    @pytest.mark.parametrize(
+        "token_ids", [torch.tensor([0, 101]), 101, 0, False], ids=["tensor", "integer", "integer-zero", "boolean"]
+    )
+    def test_custom_pipeline_ids_bypass_rejection(self, supported, key, token_ids) -> None:
         engine = self._engine(supported=supported)
 
-        engine.add_request(self._request({key: torch.tensor([0, 101])}))
+        engine.add_request(self._request({key: token_ids}))
 
         assert len(engine.scheduler._waiting_queue) == 1
 
