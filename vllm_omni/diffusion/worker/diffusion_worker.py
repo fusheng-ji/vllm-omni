@@ -1646,7 +1646,10 @@ class WorkerProc:
         except Exception as e:
             # Client errors are logged once, without a traceback, where they
             # are handled: here for rank-status RPCs, else in the busy loop.
-            if not isinstance(e, OmniClientError):
+            # The executor folds status tracebacks into its error message, so
+            # client errors carry none there either.
+            client_error = isinstance(e, OmniClientError)
+            if not client_error:
                 logger.error(f"Error executing RPC: {e}", exc_info=True)
             elif collect_rank_status:
                 logger.warning("Rejected RPC request: %s", e)
@@ -1655,7 +1658,7 @@ class WorkerProc:
                     "ok": False,
                     "error": str(e),
                     "error_type": type(e).__name__,
-                    "traceback": traceback.format_exc(),
+                    "traceback": None if client_error else traceback.format_exc(),
                 }
             )
             if not collect_rank_status:
