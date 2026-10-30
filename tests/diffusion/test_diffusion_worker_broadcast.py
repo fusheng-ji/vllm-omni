@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+# SPDX-FileCopyrightText: Copyright contributors to the vLLM-Omni project
 
 import threading
 import time
@@ -10,6 +10,7 @@ from vllm.distributed.device_communicators.shm_broadcast import MessageQueue
 
 import vllm_omni.diffusion.worker.diffusion_worker as diffusion_worker_module
 from vllm_omni.diffusion.worker.diffusion_worker import WorkerProc
+from vllm_omni.errors import OmniClientError
 
 pytestmark = [pytest.mark.core_model, pytest.mark.diffusion, pytest.mark.cpu]
 
@@ -108,6 +109,39 @@ def test_busy_loop_releases_failed_rpc_traceback_and_device_cache(monkeypatch):
     assert original.__traceback__ is None
     gc_collect.assert_called_once_with()
     mock_platform.empty_cache.assert_called_once_with()
+
+
+@pytest.mark.parametrize("client_error", [True, False], ids=["client-error-warns", "server-error-logs-traceback"])
+def test_busy_loop_logs_client_rpc_errors_without_traceback(monkeypatch, client_error):
+    exc = OmniClientError("bad overlap") if client_error else RuntimeError("cuda failed")
+    worker_proc = WorkerProc.__new__(WorkerProc)
+    worker_proc.gpu_id = 0
+    worker_proc.mq = Mock()
+    worker_proc.mq.dequeue.side_effect = [
+        {"type": "rpc", "method": "execute_model", "args": (), "kwargs": {}, "rpc_id": "7"},
+        {"type": "shutdown"},
+    ]
+    worker_proc.worker = Mock()
+    worker_proc.worker.execute_method.side_effect = exc
+    worker_proc.result_mq = object()
+    worker_proc._enqueue_result = Mock()
+    worker_proc.wake_event = None
+    worker_proc._running = True
+    logger = Mock()
+    monkeypatch.setattr(diffusion_worker_module, "logger", logger)
+    monkeypatch.setattr(diffusion_worker_module, "current_omni_platform", Mock())
+
+    worker_proc._worker_busy_loop()
+
+    if client_error:
+        logger.warning.assert_called_once()
+        logger.error.assert_not_called()
+    else:
+        assert logger.error.call_args_list
+        assert all(call.kwargs.get("exc_info") is True for call in logger.error.call_args_list)
+    reply = worker_proc._enqueue_result.call_args.args[0]
+    assert reply.rpc_id == "7"
+    assert reply.error_status_code == (400 if client_error else None)
 
 
 def test_busy_loop_preserves_order_when_overflow_payload_is_delayed(monkeypatch):

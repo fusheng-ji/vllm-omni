@@ -512,6 +512,9 @@ def prepare_encoder_inputs(
     if lock_audio and len(audio_values) != 1:
         raise OmniClientError("MiniMax H3 lock_source requires exactly one driving audio")
     task = task if task is not None else _resolve_task(extra_args, multi_modal_data)
+    # Authoritative early guard for the split-encoder path: reject bad continuation
+    # options before loading references. step_execution is unknown here; the pipeline
+    # re-validates with the real value.
     resolve_continuation(extra_args, task=task)
     raw_images = load_minimax_h3_images(image_values) if image_values else []
 

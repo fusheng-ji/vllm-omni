@@ -85,6 +85,7 @@ from vllm_omni.diffusion.vllm_config import create_diffusion_vllm_config, resolv
 from vllm_omni.diffusion.worker.diffusion_model_runner import DiffusionModelRunner
 from vllm_omni.diffusion.worker.utils import BaseRunnerOutput, BatchRunnerOutput
 from vllm_omni.engine.stage_init_utils import set_death_signal
+from vllm_omni.errors import OmniClientError
 from vllm_omni.inputs.data import OmniInteractionPrompt
 from vllm_omni.lora.request import LoRARequest
 from vllm_omni.platforms import current_omni_platform
@@ -1643,7 +1644,12 @@ class WorkerProc:
             # Use execute_method from WorkerWrapperBase for consistent method resolution
             result = self.worker.execute_method(method, *args, **kwargs)
         except Exception as e:
-            logger.error(f"Error executing RPC: {e}", exc_info=True)
+            # Client errors are logged once, without a traceback, where they
+            # are handled: here for rank-status RPCs, else in the busy loop.
+            if not isinstance(e, OmniClientError):
+                logger.error(f"Error executing RPC: {e}", exc_info=True)
+            elif collect_rank_status:
+                logger.warning("Rejected RPC request: %s", e)
             status.update(
                 {
                     "ok": False,
@@ -1729,7 +1735,11 @@ class WorkerProc:
                     if should_reply:
                         self._return_result(result, rpc_id=rpc_id)
                 except Exception as e:
-                    logger.error(f"Error processing RPC: {e}", exc_info=True)
+                    if isinstance(e, OmniClientError):
+                        # Request validation failure, not a server fault.
+                        logger.warning("Rejected RPC request: %s", e)
+                    else:
+                        logger.error(f"Error processing RPC: {e}", exc_info=True)
                     error = str(e)
                     _cleanup_after_execution_error(e)
                     # Apply the same reply gate as the success path so

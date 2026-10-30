@@ -2862,6 +2862,8 @@ class MiniMaxH3Pipeline(
                     raise OmniClientError(
                         "MiniMax H3 diffusion stage requires text encoder conditioning when text_encoder is not loaded"
                     )
+                # prepare_encoder_inputs validates the same options again; this call
+                # runs first so the step-execution check also precedes reference work.
                 continuation = resolve_continuation(
                     sampling.extra_args or {},
                     task=task,

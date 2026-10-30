@@ -89,7 +89,11 @@ def test_continuation_validation_precedes_reference_and_encoder_work(
     pipeline.diffuse.assert_not_called()
 
 
-@pytest.mark.parametrize("step_execution", [False, True], ids=["invalid-overlap", "step-execution"])
+@pytest.mark.parametrize(
+    "step_execution",
+    [False, True],
+    ids=["request-mode-invalid-overlap", "step-mode-precedes-grid-check"],
+)
 def test_continuation_validation_error_reaches_all_ranks_before_encoder_collectives(
     pipeline, monkeypatch, mocker, step_execution
 ):
