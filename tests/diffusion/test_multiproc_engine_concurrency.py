@@ -360,7 +360,11 @@ class TestRequestModeDispatch:
         ["ok", "server-error"],
         ids=["client-error-restored", "server-error-outranks-client-error"],
     )
-    def test_dlo_dp_multi_rank_error_reply_restores_client_error(self, other_reply):
+    def test_dlo_dp_multi_rank_error_reply_restores_client_error(self, monkeypatch, other_reply):
+        from vllm_omni.diffusion.executor import multiproc_executor as executor_module
+
+        logger = Mock()
+        monkeypatch.setattr(executor_module, "logger", logger)
         executor, req_q, res_q = _make_executor(num_gpus=2)
         executor.od_config = SimpleNamespace(
             step_execution=False,
@@ -391,14 +395,20 @@ class TestRequestModeDispatch:
             executor.collective_rpc("execute_model", unique_reply_rank=None, exec_all_ranks=True)
         thread.join(timeout=2)
 
+        suppressed_logs = [call for call in logger.warning.call_args_list if "not raised" in call.args[0]]
         if other_reply == "ok":
             assert isinstance(exc_info.value, OmniClientError)
             assert exc_info.value.status_code == 422
             assert exc_info.value.error_type == "X"
             assert str(exc_info.value) == "bad overlap"
+            assert not suppressed_logs
         else:
             assert type(exc_info.value) is RuntimeError
             assert "cuda failed" in str(exc_info.value)
+            # The dropped client error stays visible for debugging.
+            (call,) = suppressed_logs
+            assert call.args[2] == 1
+            assert "OmniClientError: bad overlap" in call.args[3]
 
     @pytest.mark.parametrize(
         ("tp_size", "sp_size", "pp_size", "cfg_size", "expected_primary_ranks"),

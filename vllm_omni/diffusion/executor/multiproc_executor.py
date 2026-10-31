@@ -919,11 +919,22 @@ class MultiprocDiffusionExecutor(DiffusionExecutor):
                         else:
                             tagged.append((len(tagged), response))
                 if collected_errors:
-                    # A server fault on any DP rank outranks a client error elsewhere.
-                    raise next(
+                    # A server fault on any DP rank outranks a client error
+                    # elsewhere; otherwise the first collected error wins, even
+                    # when client errors carry different status codes.
+                    raised = next(
                         (exc for exc in collected_errors if not isinstance(exc, OmniClientError)),
                         collected_errors[0],
                     )
+                    suppressed = [exc for exc in collected_errors if exc is not raised]
+                    if suppressed:
+                        logger.warning(
+                            "RPC %s: %d other DP rank error(s) not raised: %s",
+                            method,
+                            len(suppressed),
+                            "; ".join(f"{type(exc).__name__}: {exc}" for exc in suppressed),
+                        )
+                    raise raised
                 tagged.sort(key=lambda x: x[0])
                 responses = [r for _, r in tagged]
             else:
