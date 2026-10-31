@@ -36,7 +36,7 @@ from vllm_omni.diffusion.offloader.config import (
 from vllm_omni.diffusion.sched.request_scheduler import build_request_batch_sampling_params_key
 from vllm_omni.diffusion.utils.future_utils import try_set_exception, try_set_result
 from vllm_omni.diffusion.worker import WorkerProc
-from vllm_omni.errors import client_error_or
+from vllm_omni.errors import OmniClientError, client_error_or
 
 if TYPE_CHECKING:
     from vllm_omni.diffusion.sched.interface import DiffusionSchedulerOutput
@@ -81,6 +81,20 @@ def _async_output_error(msg: AsyncDiffusionOutput) -> BaseException:
         status_code=msg.error_status_code,
         error_type=msg.error_type,
         fallback=RuntimeError,
+    )
+
+
+def _rpc_error_reply_exception(response: dict[str, Any], fallback: Callable[[str], BaseException]) -> BaseException:
+    """Rebuild the exception carried by a synchronous ``{"status": "error"}`` reply.
+
+    Mirrors :func:`_async_output_error` for the dict replies sent outside the
+    ``rpc_id`` path, so a worker-side ``OmniClientError`` stays a 4xx.
+    """
+    return client_error_or(
+        str(response.get("error", "unknown")),
+        status_code=response.get("error_status_code"),
+        error_type=response.get("error_type"),
+        fallback=fallback,
     )
 
 
@@ -306,9 +320,11 @@ class MultiprocDiffusionExecutor(DiffusionExecutor):
     @staticmethod
     def _raise_for_rpc_error_dict(response: Any) -> None:
         if isinstance(response, dict) and response.get("status") == "error":
-            raise RuntimeError(
-                f"Worker failed with error '{response.get('error')}', "
-                "please check the stack trace above for the root cause"
+            raise _rpc_error_reply_exception(
+                response,
+                lambda error: RuntimeError(
+                    f"Worker failed with error '{error}', please check the stack trace above for the root cause"
+                ),
             )
 
     @staticmethod
@@ -884,7 +900,7 @@ class MultiprocDiffusionExecutor(DiffusionExecutor):
                         )
                     result_mqs = [all_result_mqs[rank] for rank in primary_ranks]
                 tagged: list[tuple[int, Any]] = []
-                collected_errors: list[str] = []
+                collected_errors: list[BaseException] = []
                 for result_mq in result_mqs:
                     response = self._dequeue_one_with_failure_polling(deadline, method, result_mq)
                     response = self._validate_wave_id(response, wave_id, deadline, method, result_mq)
@@ -893,7 +909,9 @@ class MultiprocDiffusionExecutor(DiffusionExecutor):
                     except Exception as e:
                         logger.warning("SHM unpack failed (data may already be inline): %s", e)
                     if isinstance(response, dict) and response.get("status") == "error":
-                        collected_errors.append(str(response.get("error", "unknown")))
+                        collected_errors.append(
+                            _rpc_error_reply_exception(response, lambda error: RuntimeError(f"Worker error: {error}"))
+                        )
                     else:
                         response = MultiprocDiffusionExecutor._handle_rpc_response(response)
                         if isinstance(response, dict) and "dp_rank" in response:
@@ -901,7 +919,11 @@ class MultiprocDiffusionExecutor(DiffusionExecutor):
                         else:
                             tagged.append((len(tagged), response))
                 if collected_errors:
-                    raise RuntimeError(f"Worker error: {collected_errors[0]}")
+                    # A server fault on any DP rank outranks a client error elsewhere.
+                    raise next(
+                        (exc for exc in collected_errors if not isinstance(exc, OmniClientError)),
+                        collected_errors[0],
+                    )
                 tagged.sort(key=lambda x: x[0])
                 responses = [r for _, r in tagged]
             else:

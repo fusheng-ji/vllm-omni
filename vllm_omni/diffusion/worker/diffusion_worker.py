@@ -85,7 +85,7 @@ from vllm_omni.diffusion.vllm_config import create_diffusion_vllm_config, resolv
 from vllm_omni.diffusion.worker.diffusion_model_runner import DiffusionModelRunner
 from vllm_omni.diffusion.worker.utils import BaseRunnerOutput, BatchRunnerOutput
 from vllm_omni.engine.stage_init_utils import set_death_signal
-from vllm_omni.errors import OmniClientError
+from vllm_omni.errors import OmniClientError, client_error_metadata
 from vllm_omni.inputs.data import OmniInteractionPrompt
 from vllm_omni.lora.request import LoRARequest
 from vllm_omni.platforms import current_omni_platform
@@ -1751,6 +1751,16 @@ class WorkerProc:
                     output_rank = msg.get("output_rank")
                     exec_all_ranks = msg.get("exec_all_ranks", False)
                     wave_id = msg.get("wave_id")
+                    # Synchronous replies carry the same client-error status as
+                    # the async envelope so the executor can restore a 4xx.
+                    error_status_code, error_type = client_error_metadata(e)
+                    error_reply = {
+                        "status": "error",
+                        "error": error,
+                        "error_status_code": error_status_code,
+                        "error_type": error_type,
+                        "wave_id": wave_id,
+                    }
                     if self.result_mq is not None:
                         if rpc_id is not None:
                             # Async RPC: must complete the executor's pending
@@ -1781,12 +1791,10 @@ class WorkerProc:
                                     dp_rank = get_data_parallel_rank()
                                 except Exception:
                                     dp_rank = self.gpu_id
-                                self._return_result(
-                                    {"status": "error", "error": error, "dp_rank": dp_rank, "wave_id": wave_id}
-                                )
+                                self._return_result({**error_reply, "dp_rank": dp_rank})
                         elif output_rank is None or output_rank == self.gpu_id:
                             # Normal RPC: only the expected rank replies
-                            self._return_result({"status": "error", "error": error, "wave_id": wave_id})
+                            self._return_result(error_reply)
 
             elif isinstance(msg, dict) and msg.get("type") == "shutdown":
                 logger.info("Worker %s: Received shutdown message", self.gpu_id)
