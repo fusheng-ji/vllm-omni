@@ -900,7 +900,7 @@ class MultiprocDiffusionExecutor(DiffusionExecutor):
                         )
                     result_mqs = [all_result_mqs[rank] for rank in primary_ranks]
                 tagged: list[tuple[int, Any]] = []
-                collected_errors: list[BaseException] = []
+                collected_errors: list[tuple[Any, BaseException]] = []
                 for result_mq in result_mqs:
                     response = self._dequeue_one_with_failure_polling(deadline, method, result_mq)
                     response = self._validate_wave_id(response, wave_id, deadline, method, result_mq)
@@ -910,7 +910,12 @@ class MultiprocDiffusionExecutor(DiffusionExecutor):
                         logger.warning("SHM unpack failed (data may already be inline): %s", e)
                     if isinstance(response, dict) and response.get("status") == "error":
                         collected_errors.append(
-                            _rpc_error_reply_exception(response, lambda error: RuntimeError(f"Worker error: {error}"))
+                            (
+                                response.get("dp_rank", "?"),
+                                _rpc_error_reply_exception(
+                                    response, lambda error: RuntimeError(f"Worker error: {error}")
+                                ),
+                            )
                         )
                     else:
                         response = MultiprocDiffusionExecutor._handle_rpc_response(response)
@@ -923,16 +928,16 @@ class MultiprocDiffusionExecutor(DiffusionExecutor):
                     # elsewhere; otherwise the first collected error wins, even
                     # when client errors carry different status codes.
                     raised = next(
-                        (exc for exc in collected_errors if not isinstance(exc, OmniClientError)),
-                        collected_errors[0],
+                        (exc for _, exc in collected_errors if not isinstance(exc, OmniClientError)),
+                        collected_errors[0][1],
                     )
-                    suppressed = [exc for exc in collected_errors if exc is not raised]
+                    suppressed = [(dp_rank, exc) for dp_rank, exc in collected_errors if exc is not raised]
                     if suppressed:
                         logger.warning(
                             "RPC %s: %d other DP rank error(s) not raised: %s",
                             method,
                             len(suppressed),
-                            "; ".join(f"{type(exc).__name__}: {exc}" for exc in suppressed),
+                            "; ".join(f"dp_rank {dp_rank}: {type(exc).__name__}: {exc}" for dp_rank, exc in suppressed),
                         )
                     raise raised
                 tagged.sort(key=lambda x: x[0])

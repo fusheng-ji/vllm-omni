@@ -357,8 +357,12 @@ class TestRequestModeDispatch:
 
     @pytest.mark.parametrize(
         "other_reply",
-        ["ok", "server-error"],
-        ids=["client-error-restored", "server-error-outranks-client-error"],
+        ["ok", "server-error", "client-error"],
+        ids=[
+            "client-error-restored",
+            "server-error-outranks-client-error",
+            "first-client-error-wins-over-other-status",
+        ],
     )
     def test_dlo_dp_multi_rank_error_reply_restores_client_error(self, monkeypatch, other_reply):
         from vllm_omni.diffusion.executor import multiproc_executor as executor_module
@@ -386,8 +390,19 @@ class TestRequestModeDispatch:
             )
             if other_reply == "ok":
                 res_q.put({"dp_rank": 1, "output": _tagged_output("1"), "wave_id": wave_id})
-            else:
+            elif other_reply == "server-error":
                 res_q.put({"status": "error", "error": "cuda failed", "dp_rank": 1, "wave_id": wave_id})
+            else:
+                res_q.put(
+                    {
+                        "status": "error",
+                        "error": "lora conflict",
+                        "error_status_code": 409,
+                        "error_type": "Y",
+                        "dp_rank": 1,
+                        "wave_id": wave_id,
+                    }
+                )
 
         thread = threading.Thread(target=worker, daemon=True)
         thread.start()
@@ -396,19 +411,26 @@ class TestRequestModeDispatch:
         thread.join(timeout=2)
 
         suppressed_logs = [call for call in logger.warning.call_args_list if "not raised" in call.args[0]]
-        if other_reply == "ok":
-            assert isinstance(exc_info.value, OmniClientError)
-            assert exc_info.value.status_code == 422
-            assert exc_info.value.error_type == "X"
-            assert str(exc_info.value) == "bad overlap"
-            assert not suppressed_logs
-        else:
+        if other_reply == "server-error":
             assert type(exc_info.value) is RuntimeError
             assert "cuda failed" in str(exc_info.value)
             # The dropped client error stays visible for debugging.
             (call,) = suppressed_logs
             assert call.args[2] == 1
-            assert "OmniClientError: bad overlap" in call.args[3]
+            assert "dp_rank 0: OmniClientError: bad overlap" in call.args[3]
+            return
+
+        # Otherwise the first collected client error is raised with its status.
+        assert isinstance(exc_info.value, OmniClientError)
+        assert exc_info.value.status_code == 422
+        assert exc_info.value.error_type == "X"
+        assert str(exc_info.value) == "bad overlap"
+        if other_reply == "ok":
+            assert not suppressed_logs
+        else:
+            (call,) = suppressed_logs
+            assert call.args[2] == 1
+            assert "dp_rank 1: OmniClientError: lora conflict" in call.args[3]
 
     @pytest.mark.parametrize(
         ("tp_size", "sp_size", "pp_size", "cfg_size", "expected_primary_ranks"),
